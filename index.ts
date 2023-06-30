@@ -1,5 +1,6 @@
 //Gives us meta data about coins/chains
-import { chains } from "@hyperbitjs/chains";
+//import { chains } from "@hyperbitjs/chains";
+import { chains } from "@neuraiproject/chains";
 
 //bip39 from mnemonic to seed
 import * as bip39 from "bip39";
@@ -10,15 +11,13 @@ const CoinKey = require("coinkey");
 const HDKey = require("hdkey");
 
 //Could not declare Network as enum, something wrong with parcel bundler
-export type Network = "rvn" | "rvn-test" | "evr" | "evr-test";
+export type Network = "xna" | "xna-test";
 
 function getNetwork(name: Network) {
   const c = name.toLowerCase(); //Just to be sure
   const map = {
-    rvn: chains.rvn.main.versions,
-    "rvn-test": chains.rvn.test.versions,
-    evr: chains.evr.main.versions,
-    "evr-test": chains.evr.test.versions,
+    xna: chains.xna.main.versions,
+    "xna-test": chains.xna.test.versions,
   };
 
   const network = map[c];
@@ -29,7 +28,7 @@ function getNetwork(name: Network) {
 }
 
 /**
- * @param network - should have value "rvn", "rvn-test", "evr" or "evr-test"
+ * @param network - should have value "xna", "xna-test"
  * @param mnemonic - your mnemonic
  * @param account - accounts in BIP44 starts from 0, 0 is the default account
  * @param position - starts from 0
@@ -92,7 +91,7 @@ export function isMnemonicValid(mnemonic: string) {
 /**
  *
  * @param privateKeyWIF
- * @param network  should be "rvn" or "rvn-test"
+ * @param network  should be "xna" or "xna-test"
  * @returns object {address, privateKey (hex), WIF}
  */
 

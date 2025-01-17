@@ -1,6 +1,5 @@
 //Gives us meta data about coins/chains
-//import { chains } from "@hyperbitjs/chains";
-import { chains } from "@neuraiproject/chains";
+import { chains } from "@hyperbitjs/chains";
 
 //bip39 from mnemonic to seed
 import * as bip39 from "bip39";
@@ -8,7 +7,9 @@ import * as bip39 from "bip39";
 const CoinKey = require("coinkey");
 
 //From seed to key
-const HDKey = require("hdkey");
+//const HDKey = require("hdkey");
+import HDKey from "hdkey";
+import { IAddressObject } from "./types";
 
 //Could not declare Network as enum, something wrong with parcel bundler
 export type Network = "xna" | "xna-test";
@@ -26,7 +27,15 @@ function getNetwork(name: Network) {
   }
   return network;
 }
-
+/**
+ *
+ * @param network
+ * @returns the coin type for the network (blockchain), for example Neurai has coin type 175
+ */
+export function getCoinType(network: Network) {
+  const chain = getNetwork(network);
+  return chain.bip44;
+}
 /**
  * @param network - should have value "xna", "xna-test"
  * @param mnemonic - your mnemonic
@@ -40,9 +49,8 @@ export function getAddressPair(
   position: number
 ) {
   const hdKey = getHDKey(network, mnemonic);
-  const chain = getNetwork(network);
-  const coin_type = chain.bip44;
-  //coint_type should always be 1 according to SLIP-0044
+  const coin_type = getCoinType(network);
+
   //https://github.com/satoshilabs/slips/blob/master/slip-0044.md
 
   //Syntax of BIP44
@@ -68,7 +76,11 @@ export function getHDKey(network: Network, mnemonic: string): any {
   return hdKey;
 }
 
-export function getAddressByPath(network: Network, hdKey: any, path: string) {
+export function getAddressByPath(
+  network: Network,
+  hdKey: any,
+  path: string
+): IAddressObject {
   const chain = getNetwork(network);
   const derived = hdKey.derive(path);
   var ck2 = new CoinKey(derived.privateKey, chain);
@@ -86,7 +98,17 @@ export function generateMnemonic() {
 }
 
 export function isMnemonicValid(mnemonic: string) {
-  return bip39.validateMnemonic(mnemonic);
+  //Check all languages
+  const wordlists = Object.values(bip39.wordlists);
+
+  //If mnemonic is valid in any language, return true, otherwise false
+  for (const wordlist of wordlists) {
+    const v = bip39.validateMnemonic(mnemonic, wordlist);
+    if (v === true) {
+      return true;
+    }
+  }
+  return false;
 }
 /**
  *
@@ -108,12 +130,41 @@ export function getAddressByWIF(network: Network, privateKeyWIF: string) {
 
 export const entropyToMnemonic = bip39.entropyToMnemonic;
 
+export function generateAddressObject(
+  network: Network = "xna"
+): IAddressObject {
+  const mnemonic = generateMnemonic();
+  const account = 0;
+  const position = 0;
+  const addressPair = getAddressPair(network, mnemonic, account, position);
+  const addressObject = addressPair.external;
+
+  const result = {
+    ...addressObject,
+    mnemonic,
+    network,
+  };
+  return result;
+}
+
+/**
+ * Generates a random Address Object
+ *
+ * @deprecated use generateAddressObject
+ * @param network
+ * @returns
+ */
+export function generateAddress(network: Network = "xna") {
+  return generateAddressObject(network);
+}
 export default {
   entropyToMnemonic,
+  generateAddress,
+  generateMnemonic,
   getAddressByPath,
   getAddressByWIF,
   getAddressPair,
+  getCoinType,
   getHDKey,
-  generateMnemonic,
   isMnemonicValid,
 };

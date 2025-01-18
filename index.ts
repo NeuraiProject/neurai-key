@@ -12,13 +12,15 @@ import HDKey from "hdkey";
 import { IAddressObject } from "./types";
 
 //Could not declare Network as enum, something wrong with parcel bundler
-export type Network = "xna" | "xna-test";
+export type Network = "xna" | "xna-test" | "evr" | "evr-test";
 
 function getNetwork(name: Network) {
   const c = name.toLowerCase(); //Just to be sure
   const map = {
-    xna: chains.xna.main.versions,
-    "xna-test": chains.xna.test.versions,
+    xna: chains.xna.mainnet.versions,
+    "xna-test": chains.xna.testnet?.versions,
+    evr: chains.evr.mainnet.versions,
+    "evr-test": chains.evr.testnet?.versions,
   };
 
   const network = map[c];
@@ -37,7 +39,7 @@ export function getCoinType(network: Network) {
   return chain.bip44;
 }
 /**
- * @param network - should have value "xna", "xna-test"
+ * @param network - should have value "xna", "xna-test", "evr" or "evr-test"
  * @param mnemonic - your mnemonic
  * @param account - accounts in BIP44 starts from 0, 0 is the default account
  * @param position - starts from 0

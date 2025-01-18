@@ -3,6 +3,7 @@
 Generate Neurai addresses from a mnemonic phrase following the standards BIP32, BIP39, BIP44.
 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
+The library also support Evrmorecoin EVR, both mainnet and testnet.
 
 
 ## Example get external and internal (change) addresses by path

@@ -44,7 +44,7 @@ test("Validate Wallet Import Format (WIF) test-net ", () => {
   );
 });
 
-test("Validate get public address from Wallet Import Format (WIF) main-et ", () => {
+test("Validate get public address from Wallet Import Format (WIF) main-net ", () => {
   const network = "xna";
   const WIF = "KyWuYcev1hJ7YJZTjWx8coXNRm4jRbMEhgVVVC8vDcTaKRCMASUE";
   const addressObject = NeuraiKey.getAddressByWIF(network, WIF);
@@ -68,4 +68,59 @@ test("Non valid bytes to mnemonic should fail", () => {
   expect(mnemonic).not.toBe(
     "patient feed learn prison angle convince first napkin uncover track open theory"
   );
+});
+
+describe("Validate diff languages", () => {
+  it("Should accept spanish mnemonic", () => {
+    const m =
+      "velero nuera pepino reír barro reforma negar rumbo atento separar pesa puma";
+    const valid = NeuraiKey.isMnemonicValid(m);
+    expect(valid).toBe(true);
+  });
+
+  it("Should accept French mnemonic", () => {
+    const m =
+      "vaseux mixte ozone quiétude besogne punaise membre réussir avarice samedi pantalon poney";
+    const valid = NeuraiKey.isMnemonicValid(m);
+    expect(valid).toBe(true);
+  });
+});
+
+it("Should accept Italian mnemonic", () => {
+  const m =
+    "veloce perforare recinto sciroppo bici scelto parabola sguardo avanzato sonnifero remoto rustico";
+  const valid = NeuraiKey.isMnemonicValid(m);
+  expect(valid).toBe(true);
+});
+
+describe("generateAddress", () => {
+  it("should generate an address with a mnemonic", () => {
+    // Call the function
+    const result = NeuraiKey.generateAddressObject();
+
+    // Assertions
+    expect(result).toHaveProperty("mnemonic");
+    expect(result.mnemonic).toBeDefined();
+    expect(result.network).toBe("xna"); //Test default
+    expect(result).toHaveProperty("address"); // replace 'key' with the actual property you expect in addressObject
+    // ... you can add more assertions based on the expected structure of the result
+  });
+
+  it("default network should be xna for Neurai", () => {
+    const network = "xna-test";
+    // Call the function
+    const result = NeuraiKey.generateAddressObject(network);
+    // Assertions
+    expect(result.network).toBe(network); //Test default
+  });
+
+  it("Should handle xna-test", () => {
+    const network = "xna-test";
+    // Call the function
+    const result = NeuraiKey.generateAddressObject(network);
+    // Assertions
+    expect(result.network).toBe(network); //Test default
+  });
+
+  // Add more tests if needed to cover different scenarios
 });

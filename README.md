@@ -3,7 +3,6 @@
 Generate Neurai addresses from a mnemonic phrase following the standards BIP32, BIP39, BIP44.
 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
-The library also support Evrmorecoin EVR, both mainnet and testnet.
 
 
 ## Example get external and internal (change) addresses by path
@@ -19,7 +18,7 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 
 const mnemonic = NeuraiKey.generateMnemonic();
 const ACCOUNT = 0; //default is zero
-const POSITION = 0; //the first address for this wallet
+const POSITION = 1; //the second address for this wallet
 const network = "xna"; //or xna-test for testnet
 const addressPair = NeuraiKey.getAddressPair(
   network,
@@ -36,21 +35,21 @@ console.log(addressPair);
 Outputs
 
 ```
-Mnemonic wrong breeze brick wrestle exotic erode news clown copy install marble promote
+Mnemonic result pact model attract result puzzle final boss private educate luggage era
 {
   internal: {
-    address: 'RC7Vn28tGaNrJtBm8MX5RCeCvzMpqZ1MgG',
-    path: "m/44'/175'/0'/1/0",
-    privateKey: 'a2c71a4284ed6792debd68d830a10515051fd166ce00535bf9fd19573ed5413b',
-    WIF: 'L2g8U3ZNBLBQcy5f6C67h2eosps3MGkNmeNnk6Y8fZiMdSB9TuCJ'
+    address: 'NQM5zP6jkwDgCZ2UQiUicW4e3YcWc4NY4S',
+    path: "m/44'/0'/0'/1/1",
+    privateKey: '03e17c16cbab7390c8eea1919cbeefbcb7e5ccdb84e3cfc84f3d5a60dfaa6b68',
+    WIF: 'Kwy4Dv5yF4vSYJvbmk5v1eYJPBgSKRLqDc6BJ5tLfYN7p8RbfCaF'
   },
   external: {
-    address: 'RE8YxTSYYcftnbX56rnAEwaiddqaqt8UgX',
-    path: "m/44'/175'/0'/0/0",
-    privateKey: 'b998a218e6bfde7162460893f79afc14b82b14e368507f5a85de28848ea96439',
-    WIF: 'L3SV871B2mpUPTvj4U38UEp3Ah3wCVukF7tG2btHgjkiUSXRftSw'
+    address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
+    path: "m/44'/0'/0'/0/1",
+    privateKey: '0456b9eed4a0fd4c2a87f53f06aa1af5e5d44b9c68e6f464fba1abf02e3d41fe',
+    WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
   },
-  position: 0
+  position: 1
 }
 ```
 
@@ -65,8 +64,8 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 
 //use NeuraiKey.generateMnemonic() to generate mnemonic codes
 const mnemonic =
-  "Mnemonic erosion total live dial hamster helmet top response cash obey anger balcony";
-const path = "m/44'/175'/0'/0/0";
+  "result pact model attract result puzzle final boss private educate luggage era";
+const path = "m/44'/0'/0'/0/1";
 const network = "xna"; //or xna-test for testnet
 const hdKey = NeuraiKey.getHDKey("xna", mnemonic);
 
@@ -80,10 +79,10 @@ Outputs
 
 ```
 {
-  address: 'RWj697pj6PijkEcJLW3BLPG4GKre3BtgRP',
-  path: "m/44'/175'/0'/0/0",
-  privateKey: 'a5592434532a09a73350906f7846d272135a56b5a34d900659b31d2bb1aa6dfe',
-  WIF: 'L2m8GmGYVAkvUEtLdhbFidQW2Zn3fULpE7sbWgmXChygNEBPd1PK'
+  address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
+  path: "m/44'/0'/0'/0/1",
+  privateKey: '0456b9eed4a0fd4c2a87f53f06aa1af5e5d44b9c68e6f464fba1abf02e3d41fe',
+  WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
 }
 ```
 
@@ -157,9 +156,9 @@ Source: https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
 
 `m / purpose' / coin_type' / account' / change / address_index`
 
-So in the case of Neurai the path m/44'/175'/0'/0/0 says "give me the first address"
+So in the case of Neurai the path m/44'/175'/0'/0/1 says "give me the second address"
 
-The first part m/44'/175' says that the purpose is to use BIP44 with Neurai (175). Consider that static code.
+The first part m/44'/175' says that the purpose is to use BIP44 with Neurai (coin_type 175). Consider that static code.
 
 Accounts is deprecated and should be 0
 

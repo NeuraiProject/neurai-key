@@ -32,7 +32,7 @@ function getNetwork(name: Network) {
 /**
  *
  * @param network
- * @returns the coin type for the network (blockchain), for example Neurai has coin type 175
+ * @returns the coin type for the network (blockchain), for example Neurai has coin type 0
  */
 export function getCoinType(network: Network) {
   const chain = getNetwork(network);

@@ -156,9 +156,9 @@ Source: https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
 
 `m / purpose' / coin_type' / account' / change / address_index`
 
-So in the case of Neurai the path m/44'/175'/0'/0/1 says "give me the second address"
+So in the case of Neurai the path m/44'/0'/0'/0/1 says "give me the second address"
 
-The first part m/44'/175' says that the purpose is to use BIP44 with Neurai (coin_type 175). Consider that static code.
+The first part m/44'/0' says that the purpose is to use BIP44 with Neurai (coin_type 0). Consider that static code.
 
 Accounts is deprecated and should be 0
 

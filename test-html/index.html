@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurai-Key Verifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 2em;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .input-section {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+        }
+
+        label {
+            display: block;
+            color: #2c3e50;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .network-selector {
+            margin: 15px 0;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-generate {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-generate:hover {
+            background: #229954;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .address-card {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 3px solid #3498db;
+            border: 1px solid #e0e0e0;
+            border-left: 3px solid #3498db;
+        }
+
+        .address-card:hover {
+            background: #f5f5f5;
+        }
+
+        .address-header {
+            font-size: 1em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .address-type {
+            font-size: 0.75em;
+            background: #3498db;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .address-info {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            display: inline-block;
+            width: 120px;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .info-value {
+            font-family: 'Courier New', monospace;
+            color: #2c3e50;
+            word-break: break-all;
+            background: white;
+            padding: 8px 10px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            border: 1px solid #e0e0e0;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .error {
+            background: #fee;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 3px solid #fc8181;
+            font-size: 0.9em;
+        }
+
+        .success {
+            background: #f0fff4;
+            color: #22543d;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 3px solid #68d391;
+            font-size: 0.9em;
+        }
+
+        .info {
+            background: #e6f7ff;
+            color: #003a70;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 3px solid #69c0ff;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            font-size: 1em;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .copy-btn {
+            background: transparent;
+            color: #555;
+            border: none;
+            padding: 6px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.2s;
+            flex: 0 0 auto;
+            width: auto;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-btn:hover {
+            color: #27ae60;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .info-label {
+                display: block;
+                margin-bottom: 5px;
+            }
+
+            .info-value {
+                display: block;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Neurai Key Verifier</h1>
+        <p class="subtitle">Generate and verify addresses from your mnemonic (12 or 24 words)</p>
+
+        <div class="input-section">
+            <label for="mnemonic">Mnemonic Phrase (12 or 24 words):</label>
+            <textarea 
+                id="mnemonic" 
+                placeholder="Enter your mnemonic phrase here, separated by spaces. Example: word1 word2 word3..."
+            ></textarea>
+
+            <div class="network-selector">
+                <label for="network">Network:</label>
+                <select id="network">
+                    <option value="xna">Neurai Mainnet (XNA)</option>
+                    <option value="xna-test">Neurai Testnet (XNA-TEST)</option>
+                </select>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="verificarYGenerar()">
+                    Verify and Generate Addresses
+                </button>
+                <button class="btn-generate" onclick="generarNuevoMnemonic()">
+                    Generate New Mnemonic
+                </button>
+                <button class="btn-secondary" onclick="limpiar()">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <div id="message"></div>
+        <div id="results" class="results"></div>
+    </div>
+
+    <script src="./NeuraiKey.js"></script>
+    <script>
+        function mostrarMensaje(mensaje, tipo) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = tipo;
+            messageDiv.innerHTML = mensaje;
+            messageDiv.classList.remove('hidden');
+        }
+
+        function ocultarMensaje() {
+            const messageDiv = document.getElementById('message');
+            messageDiv.classList.add('hidden');
+        }
+
+        function limpiar() {
+            document.getElementById('mnemonic').value = '';
+            document.getElementById('results').innerHTML = '';
+            ocultarMensaje();
+        }
+
+        function generarNuevoMnemonic() {
+            try {
+                const mnemonic = NeuraiKey.generateMnemonic();
+                document.getElementById('mnemonic').value = mnemonic;
+                mostrarMensaje('New mnemonic generated. Save it in a safe place!', 'success');
+                document.getElementById('results').innerHTML = '';
+            } catch (error) {
+                mostrarMensaje(`Error generating mnemonic: ${error.message}`, 'error');
+            }
+        }
+
+        function copiarTexto(texto, boton) {
+            navigator.clipboard.writeText(texto).then(() => {
+                const textoOriginal = boton.textContent;
+                boton.textContent = '✓';
+                setTimeout(() => {
+                    boton.textContent = textoOriginal;
+                }, 2000);
+            }).catch(err => {
+                alert('Error copying: ' + err);
+            });
+        }
+
+        function verificarYGenerar() {
+            ocultarMensaje();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">Generating addresses...</div>';
+
+            setTimeout(() => {
+                try {
+                    const mnemonic = document.getElementById('mnemonic').value.trim();
+                    const network = document.getElementById('network').value;
+
+                    if (!mnemonic) {
+                        mostrarMensaje('Please enter a mnemonic phrase', 'error');
+                        resultsDiv.innerHTML = '';
+                        return;
+                    }
+
+                    // Validar que sea un mnemonic válido
+                    const palabras = mnemonic.split(/\s+/).filter(p => p.length > 0);
+                    if (palabras.length !== 12 && palabras.length !== 24) {
+                        mostrarMensaje('Mnemonic must have exactly 12 or 24 words. Words found: ' + palabras.length, 'error');
+                        resultsDiv.innerHTML = '';
+                        return;
+                    }
+
+                    // Validar el mnemonic con bip39
+                    if (!NeuraiKey.validateMnemonic || typeof NeuraiKey.validateMnemonic !== 'function') {
+                        // Si no existe validateMnemonic, intentar generar una dirección para validar
+                        try {
+                            NeuraiKey.getAddressPair(network, mnemonic, 0, 0);
+                        } catch (e) {
+                            mostrarMensaje('Invalid mnemonic: ' + e.message, 'error');
+                            resultsDiv.innerHTML = '';
+                            return;
+                        }
+                    }
+
+                    mostrarMensaje(`Valid mnemonic (${palabras.length} words). Generating addresses on ${network}...`, 'success');
+
+                    let html = '';
+
+                    // Generar las primeras 5 direcciones
+                    for (let i = 0; i < 5; i++) {
+                        const addressPair = NeuraiKey.getAddressPair(network, mnemonic, 0, i);
+
+                        // Dirección Externa (para recibir)
+                        html += `
+                            <div class="address-card">
+                                <div class="address-header">
+                                    <span>Address #${i + 1} - External (Receive)</span>
+                                    <span class="address-type">EXTERNAL</span>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Address:</span>
+                                    <span class="info-value">${addressPair.external.address}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.external.address}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Path:</span>
+                                    <span class="info-value">${addressPair.external.path}</span>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Private Key:</span>
+                                    <span class="info-value">${addressPair.external.privateKey}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.external.privateKey}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">WIF:</span>
+                                    <span class="info-value">${addressPair.external.WIF}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.external.WIF}', this)">📋</button>
+                                </div>
+                            </div>
+
+                            <div class="address-card">
+                                <div class="address-header">
+                                    <span>Address #${i + 1} - Internal (Change)</span>
+                                    <span class="address-type" style="background: #f5576c;">INTERNAL</span>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Address:</span>
+                                    <span class="info-value">${addressPair.internal.address}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.internal.address}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Path:</span>
+                                    <span class="info-value">${addressPair.internal.path}</span>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">Private Key:</span>
+                                    <span class="info-value">${addressPair.internal.privateKey}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.internal.privateKey}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
+                                    <span class="info-label">WIF:</span>
+                                    <span class="info-value">${addressPair.internal.WIF}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.internal.WIF}', this)">📋</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    resultsDiv.innerHTML = html;
+
+                    // Agregar mensaje informativo
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'info';
+                    infoDiv.innerHTML = `
+                        <strong>Information:</strong><br>
+                        - The first 5 addresses (external and internal) have been generated<br>
+                        - <strong>External</strong> addresses are used to receive payments<br>
+                        - <strong>Internal</strong> addresses are used as change addresses<br>
+                        - Each pair follows the BIP44 standard with path m/44'/175'/0'/change/index
+                    `;
+                    resultsDiv.appendChild(infoDiv);
+
+                } catch (error) {
+                    mostrarMensaje(`Error: ${error.message}`, 'error');
+                    resultsDiv.innerHTML = '';
+                }
+            }, 100);
+        }
+
+        // Permitir verificar con Enter
+        document.getElementById('mnemonic').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                verificarYGenerar();
+            }
+        });
+    </script>
+</body>
+</html>

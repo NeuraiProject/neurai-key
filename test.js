@@ -7,49 +7,41 @@ test("Random mnemonic should contain 12 words", () => {
 
 test("Validate address on main-net", () => {
   const network = "xna";
-  const mnemonic =
-    "orphan resemble brain dwarf bus fancy horn among cricket logic duty crater";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
-  expect(address.external.address).toBe("RKbP9SMo2KTKWsiTrEDhTWPuaTwfuPiN8G");
+  expect(address.external.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
 });
 
 test("Validate address on test-net", () => {
   const network = "xna-test";
-  const mnemonic =
-    "orphan resemble brain dwarf bus fancy horn among cricket logic duty crater";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
-  expect(address.external.address).toBe("n1nUspcdAaDAMfx2ksZJ5cDa7UKVEGstrX");
+  expect(address.external.address).toBe("tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9");
 });
 
 test("Validate Wallet Import Format (WIF) main-net ", () => {
   const network = "xna";
-  const mnemonic =
-    "orphan resemble brain dwarf bus fancy horn among cricket logic duty crater";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
-  expect(address.internal.address).toBe("RLnvUoy29k3QiQgtR6PL416rSNfHTuwhyU");
-  expect(address.external.WIF).toBe(
-    "KyWuYcev1hJ7YJZTjWx8coXNRm4jRbMEhgVVVC8vDcTaKRCMASUE"
-  );
+  expect(address.internal.address).toBe("NQM5zP6jkwDgCZ2UQiUicW4e3YcWc4NY4S");
+  expect(address.external.WIF).toBe("KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq");
 });
 
 test("Validate Wallet Import Format (WIF) test-net ", () => {
   const network = "xna-test";
-  const mnemonic =
-    "orphan resemble brain dwarf bus fancy horn among cricket logic duty crater";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
-  expect(address.external.WIF).toBe(
-    "cPchRRmzZXtPeFLHfrh8qcwaRaziJCS4gcAMBVVQh1EiehNyBtKB"
-  );
+  expect(address.external.WIF).toBe("cSfwLzc9DNj4PdzyGK1sAZzxNwih2HaezMrT8w4MXyhf8qhaHJiE");
 });
 
 test("Validate get public address from Wallet Import Format (WIF) main-net ", () => {
   const network = "xna";
-  const WIF = "KyWuYcev1hJ7YJZTjWx8coXNRm4jRbMEhgVVVC8vDcTaKRCMASUE";
+  const WIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
   const addressObject = NeuraiKey.getAddressByWIF(network, WIF);
 
-  expect(addressObject.address).toBe("RKbP9SMo2KTKWsiTrEDhTWPuaTwfuPiN8G");
+  expect(addressObject.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
 });
 
 test("Valid bytes to mnemonic", () => {
@@ -73,14 +65,14 @@ test("Non valid bytes to mnemonic should fail", () => {
 describe("Validate diff languages", () => {
   it("Should accept spanish mnemonic", () => {
     const m =
-      "velero nuera pepino reír barro reforma negar rumbo atento separar pesa puma";
+      "velero nuera pepino reír barro reforma negar rumbo atento separar pesa puma";
     const valid = NeuraiKey.isMnemonicValid(m);
     expect(valid).toBe(true);
   });
 
   it("Should accept French mnemonic", () => {
     const m =
-      "vaseux mixte ozone quiétude besogne punaise membre réussir avarice samedi pantalon poney";
+      "vaseux mixte ozone quiétude besogne punaise membre réussir avarice samedi pantalon poney";
     const valid = NeuraiKey.isMnemonicValid(m);
     expect(valid).toBe(true);
   });

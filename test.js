@@ -19,6 +19,41 @@ test("Validate address on test-net", () => {
   expect(address.external.address).toBe("tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9");
 });
 
+test("Validate address with passphrase on main-net", () => {
+  const network = "xna";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  const passphrase = "my secret passphrase";
+  const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
+  // With passphrase, the address should be different from the one without passphrase
+  expect(address.external.address).not.toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+  // Verify it generates consistently with the same passphrase
+  const address2 = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
+  expect(address.external.address).toBe(address2.external.address);
+});
+
+test("Different passphrases generate different addresses", () => {
+  const network = "xna";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  const passphrase1 = "passphrase1";
+  const passphrase2 = "passphrase2";
+  
+  const address1 = NeuraiKey.getAddressPair(network, mnemonic, 0, 0, passphrase1);
+  const address2 = NeuraiKey.getAddressPair(network, mnemonic, 0, 0, passphrase2);
+  
+  expect(address1.external.address).not.toBe(address2.external.address);
+});
+
+test("Empty passphrase equals no passphrase", () => {
+  const network = "xna";
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  
+  const addressWithEmpty = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, "");
+  const addressWithoutPassphrase = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
+  
+  expect(addressWithEmpty.external.address).toBe(addressWithoutPassphrase.external.address);
+  expect(addressWithEmpty.external.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+});
+
 test("Validate Wallet Import Format (WIF) main-net ", () => {
   const network = "xna";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";

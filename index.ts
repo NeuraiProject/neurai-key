@@ -12,15 +12,13 @@ import HDKey from "hdkey";
 import { IAddressObject } from "./types";
 
 //Could not declare Network as enum, something wrong with parcel bundler
-export type Network = "xna" | "xna-test" | "evr" | "evr-test";
+export type Network = "xna" | "xna-test";
 
 function getNetwork(name: Network) {
   const c = name.toLowerCase(); //Just to be sure
   const map = {
     xna: chains.xna.mainnet.versions,
     "xna-test": chains.xna.testnet?.versions,
-    evr: chains.evr.mainnet.versions,
-    "evr-test": chains.evr.testnet?.versions,
   };
 
   const network = map[c];
@@ -32,7 +30,7 @@ function getNetwork(name: Network) {
 /**
  *
  * @param network
- * @returns the coin type for the network (blockchain), for example Neurai has coin type 0
+ * @returns the coin type for the network (blockchain), for example Neurai has coin type 175
  */
 export function getCoinType(network: Network) {
   const chain = getNetwork(network);
@@ -43,14 +41,16 @@ export function getCoinType(network: Network) {
  * @param mnemonic - your mnemonic
  * @param account - accounts in BIP44 starts from 0, 0 is the default account
  * @param position - starts from 0
+ * @param passphrase - optional BIP39 passphrase (25th word) for additional security
  */
 export function getAddressPair(
   network: Network,
   mnemonic: string,
   account: number,
-  position: number
+  position: number,
+  passphrase: string = ""
 ) {
-  const hdKey = getHDKey(network, mnemonic);
+  const hdKey = getHDKey(network, mnemonic, passphrase);
   const coin_type = getCoinType(network);
 
   //https://github.com/satoshilabs/slips/blob/master/slip-0044.md
@@ -70,9 +70,9 @@ export function getAddressPair(
   };
 }
 
-export function getHDKey(network: Network, mnemonic: string): any {
+export function getHDKey(network: Network, mnemonic: string, passphrase: string = ""): any {
   const chain = getNetwork(network);
-  const seed = bip39.mnemonicToSeedSync(mnemonic).toString("hex");
+  const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase).toString("hex");
   //From the seed, get a hdKey, can we use CoinKey instead?
   const hdKey = HDKey.fromMasterSeed(Buffer.from(seed, "hex"), chain.bip32);
   return hdKey;
@@ -133,12 +133,13 @@ export function getAddressByWIF(network: Network, privateKeyWIF: string) {
 export const entropyToMnemonic = bip39.entropyToMnemonic;
 
 export function generateAddressObject(
-  network: Network = "xna"
+  network: Network = "xna",
+  passphrase: string = ""
 ): IAddressObject {
   const mnemonic = generateMnemonic();
   const account = 0;
   const position = 0;
-  const addressPair = getAddressPair(network, mnemonic, account, position);
+  const addressPair = getAddressPair(network, mnemonic, account, position, passphrase);
   const addressObject = addressPair.external;
 
   const result = {

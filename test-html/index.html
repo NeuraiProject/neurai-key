@@ -314,6 +314,19 @@
                 </select>
             </div>
 
+            <div class="network-selector">
+                <label for="passphrase">Passphrase (Optional - BIP39 25th word):</label>
+                <input 
+                    type="text" 
+                    id="passphrase" 
+                    placeholder="Enter optional passphrase for extra security"
+                    style="width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 14px;"
+                />
+                <small style="color: #7f8c8d; font-size: 0.85em; display: block; margin-top: 5px;">
+                    ⚠️ Warning: Different passphrases create different wallets. If you use a passphrase, you'll need both the mnemonic AND passphrase to recover your wallet.
+                </small>
+            </div>
+
             <div class="button-group">
                 <button class="btn-primary" onclick="verificarYGenerar()">
                     Verify and Generate Addresses
@@ -347,6 +360,7 @@
 
         function limpiar() {
             document.getElementById('mnemonic').value = '';
+            document.getElementById('passphrase').value = '';
             document.getElementById('results').innerHTML = '';
             ocultarMensaje();
         }
@@ -383,6 +397,7 @@
                 try {
                     const mnemonic = document.getElementById('mnemonic').value.trim();
                     const network = document.getElementById('network').value;
+                    const passphrase = document.getElementById('passphrase').value; // Obtener passphrase
 
                     if (!mnemonic) {
                         mostrarMensaje('Please enter a mnemonic phrase', 'error');
@@ -402,7 +417,7 @@
                     if (!NeuraiKey.validateMnemonic || typeof NeuraiKey.validateMnemonic !== 'function') {
                         // Si no existe validateMnemonic, intentar generar una dirección para validar
                         try {
-                            NeuraiKey.getAddressPair(network, mnemonic, 0, 0);
+                            NeuraiKey.getAddressPair(network, mnemonic, 0, 0, passphrase);
                         } catch (e) {
                             mostrarMensaje('Invalid mnemonic: ' + e.message, 'error');
                             resultsDiv.innerHTML = '';
@@ -410,13 +425,14 @@
                         }
                     }
 
-                    mostrarMensaje(`Valid mnemonic (${palabras.length} words). Generating addresses on ${network}...`, 'success');
+                    const passphraseMsg = passphrase ? ' with passphrase' : '';
+                    mostrarMensaje(`Valid mnemonic (${palabras.length} words). Generating addresses on ${network}${passphraseMsg}...`, 'success');
 
                     let html = '';
 
                     // Generar las primeras 5 direcciones
                     for (let i = 0; i < 5; i++) {
-                        const addressPair = NeuraiKey.getAddressPair(network, mnemonic, 0, i);
+                        const addressPair = NeuraiKey.getAddressPair(network, mnemonic, 0, i, passphrase); // Usar passphrase
 
                         // Dirección Externa (para recibir)
                         html += `
@@ -479,12 +495,13 @@
                     // Agregar mensaje informativo
                     const infoDiv = document.createElement('div');
                     infoDiv.className = 'info';
+                    const passphraseInfo = passphrase ? '<br>- 🔐 <strong>Passphrase used:</strong> Remember you need BOTH mnemonic and passphrase to recover these addresses!' : '';
                     infoDiv.innerHTML = `
                         <strong>Information:</strong><br>
                         - The first 5 addresses (external and internal) have been generated<br>
                         - <strong>External</strong> addresses are used to receive payments<br>
                         - <strong>Internal</strong> addresses are used as change addresses<br>
-                        - Each pair follows the BIP44 standard with path m/44'/0'/0'/change/index
+                        - Each pair follows the BIP44 standard with path m/44'/175'/0'/change/index${passphraseInfo}
                     `;
                     resultsDiv.appendChild(infoDiv);
 
@@ -498,6 +515,14 @@
         // Permitir verificar con Enter
         document.getElementById('mnemonic').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                verificarYGenerar();
+            }
+        });
+        
+        // También permitir verificar con Enter en el campo de passphrase
+        document.getElementById('passphrase').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 verificarYGenerar();
             }

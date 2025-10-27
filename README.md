@@ -4,6 +4,14 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
+## Features
+
+- ✅ Generate HD wallets from mnemonic phrases (BIP39)
+- ✅ Derive addresses using BIP32/BIP44 standards
+- ✅ Support for passphrase (25th word) for additional security
+- ✅ Multi-language mnemonic support (English, Spanish, French, Italian, etc.)
+- ✅ Mainnet and Testnet support for Neurai (XNA)
+
 
 ## Example get external and internal (change) addresses by path
 
@@ -53,6 +61,45 @@ Mnemonic result pact model attract result puzzle final boss private educate lugg
 }
 ```
 
+## Example with Passphrase (BIP39 25th word)
+
+For enhanced security, you can use an optional passphrase (also known as the "25th word"). 
+This creates a completely different set of addresses from the same mnemonic.
+
+**Important**: If you lose your passphrase, you cannot recover your wallet even with the mnemonic!
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+const passphrase = "my secret passphrase"; // Optional but highly secure
+const network = "xna";
+const ACCOUNT = 0;
+const POSITION = 0;
+
+// Generate address with passphrase
+const addressPair = NeuraiKey.getAddressPair(
+  network,
+  mnemonic,
+  ACCOUNT,
+  POSITION,
+  passphrase  // 5th parameter (optional)
+);
+
+console.log(addressPair.external.address);
+// This will generate a DIFFERENT address than without the passphrase
+
+// Without passphrase (or empty string)
+const addressPairNoPass = NeuraiKey.getAddressPair(network, mnemonic, ACCOUNT, POSITION);
+console.log(addressPairNoPass.external.address);
+// This generates the standard address
+```
+
+**Use cases for passphrase:**
+- Extra layer of security beyond the mnemonic
+- Create multiple wallets from a single mnemonic
+- Plausible deniability (different passphrases = different wallets)
+
 ## Example get the first public address for a wallet by BIP44 path
 
 Note this is the fastest way to generate/derive addresses since we can re-use the hdKey object.
@@ -65,9 +112,12 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 //use NeuraiKey.generateMnemonic() to generate mnemonic codes
 const mnemonic =
   "result pact model attract result puzzle final boss private educate luggage era";
-const path = "m/44'/0'/0'/0/1";
+const path = "m/44'/175'/0'/0/1";
 const network = "xna"; //or xna-test for testnet
-const hdKey = NeuraiKey.getHDKey("xna", mnemonic);
+
+// Optional: add passphrase as third parameter
+const passphrase = ""; // empty string or omit for no passphrase
+const hdKey = NeuraiKey.getHDKey(network, mnemonic, passphrase);
 
 const address = NeuraiKey.getAddressByPath(network, hdKey, path);
 

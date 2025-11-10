@@ -11,6 +11,7 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Support for passphrase (25th word) for additional security
 - ✅ Multi-language mnemonic support (English, Spanish, French, Italian, etc.)
 - ✅ Mainnet and Testnet support for Neurai (XNA)
+- ✅ Convert raw public keys into Neurai mainnet or testnet addresses
 
 
 ## Example get external and internal (change) addresses by path
@@ -48,13 +49,15 @@ Mnemonic result pact model attract result puzzle final boss private educate lugg
   internal: {
     address: 'NQM5zP6jkwDgCZ2UQiUicW4e3YcWc4NY4S',
     path: "m/44'/0'/0'/1/1",
-    privateKey: '03e17c16cbab7390c8eea1919cbeefbcb7e5ccdb84e3cfc84f3d5a60dfaa6b68',
-    WIF: 'Kwy4Dv5yF4vSYJvbmk5v1eYJPBgSKRLqDc6BJ5tLfYN7p8RbfCaF'
+    publicKey: '02fe9a4190973398c54cdea353cb5b18aba4f272324ac3f15f4f204ef0884538e7',
+    privateKey: '8ce41bc45958cf3f4124bcd40b940752fbaf9be58ed8dec2dd7551388523f0a9',
+    WIF: 'L1was5cU14EbQDfz4BpiWhNAWZdmc4o1VSzv5w5GgKzSJwHpnGzP'
   },
   external: {
     address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
     path: "m/44'/0'/0'/0/1",
-    privateKey: '0456b9eed4a0fd4c2a87f53f06aa1af5e5d44b9c68e6f464fba1abf02e3d41fe',
+    publicKey: '024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0',
+    privateKey: '08ae5a08aa6a464619c177a551488c868010b4d2b2249892712be9a4990f9fc3',
     WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
   },
   position: 1
@@ -131,10 +134,34 @@ Outputs
 {
   address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
   path: "m/44'/0'/0'/0/1",
-  privateKey: '0456b9eed4a0fd4c2a87f53f06aa1af5e5d44b9c68e6f464fba1abf02e3d41fe',
+  publicKey: '024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0',
+  privateKey: '08ae5a08aa6a464619c177a551488c868010b4d2b2249892712be9a4990f9fc3',
   WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
 }
 ```
+
+## Convert a public key into a Neurai address
+
+Every derived address now exposes the compressed public key so you can verify or reconstruct the address later. If you only have the raw public key (33-byte compressed or 65-byte uncompressed) you can convert it back into a Neurai address on either network:
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+const pair = NeuraiKey.getAddressPair("xna", mnemonic, 0, 1);
+
+// `publicKey` is a hex string, but Buffers are also accepted
+const reconstructed = NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey);
+
+console.log(reconstructed); // NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp
+
+// Works the same way for testnet
+const testPair = NeuraiKey.getAddressPair("xna-test", mnemonic, 0, 1);
+const testAddress = NeuraiKey.publicKeyToAddress("xna-test", testPair.external.publicKey);
+console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
+```
+
+`publicKeyToAddress` throws if the key length is not 33 or 65 bytes so invalid inputs are surfaced immediately.
 
 ## How to import into your project
 

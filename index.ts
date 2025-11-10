@@ -4,21 +4,23 @@ import { chains } from "@hyperbitjs/chains";
 //bip39 from mnemonic to seed
 import * as bip39 from "bip39";
 
+import { createHash } from "crypto";
 const CoinKey = require("coinkey");
 
 //From seed to key
-//const HDKey = require("hdkey");
-import HDKey from "hdkey";
+const HDKey = require("hdkey");
 import { IAddressObject } from "./types";
+const bs58check = require("bs58check");
 
 //Could not declare Network as enum, something wrong with parcel bundler
 export type Network = "xna" | "xna-test";
 
 function getNetwork(name: Network) {
-  const c = name.toLowerCase(); //Just to be sure
-  const map = {
-    xna: chains.xna.mainnet.versions,
-    "xna-test": chains.xna.testnet?.versions,
+  const c = name.toLowerCase() as Network; //Just to be sure
+  const chainData = chains as any;
+  const map: Record<Network, any> = {
+    xna: chainData.xna.mainnet.versions,
+    "xna-test": chainData.xna.testnet?.versions,
   };
 
   const network = map[c];
@@ -90,6 +92,7 @@ export function getAddressByPath(
   return {
     address: ck2.publicAddress,
     path: path,
+    publicKey: ck2.publicKey.toString("hex"),
     privateKey: ck2.privateKey.toString("hex"),
     WIF: ck2.privateWif,
   };
@@ -150,6 +153,29 @@ export function generateAddressObject(
   return result;
 }
 
+export function publicKeyToAddress(
+  network: Network,
+  publicKey: Buffer | string
+): string {
+  const chain = getNetwork(network);
+  const keyBuffer = Buffer.isBuffer(publicKey)
+    ? publicKey
+    : Buffer.from(publicKey, "hex");
+
+  if (keyBuffer.length !== 33 && keyBuffer.length !== 65) {
+    throw new Error("Public key must be 33 or 65 bytes");
+  }
+
+  const sha256Hash = createHash("sha256").update(keyBuffer).digest();
+  const ripemd160Hash = createHash("ripemd160").update(sha256Hash).digest();
+  const payload = Buffer.concat([
+    Buffer.from([chain.public]),
+    ripemd160Hash,
+  ]);
+
+  return bs58check.encode(payload);
+}
+
 /**
  * Generates a random Address Object
  *
@@ -170,4 +196,5 @@ export default {
   getCoinType,
   getHDKey,
   isMnemonicValid,
+  publicKeyToAddress,
 };

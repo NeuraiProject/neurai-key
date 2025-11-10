@@ -63,12 +63,30 @@ test("Validate Wallet Import Format (WIF) main-net ", () => {
   expect(address.external.WIF).toBe("KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq");
 });
 
+test("Convert external public key to main-net address", () => {
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  const pair = NeuraiKey.getAddressPair("xna", mnemonic, 0, 1);
+
+  expect(NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey)).toBe(
+    pair.external.address
+  );
+});
+
 test("Validate Wallet Import Format (WIF) test-net ", () => {
   const network = "xna-test";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
   expect(address.external.WIF).toBe("cSfwLzc9DNj4PdzyGK1sAZzxNwih2HaezMrT8w4MXyhf8qhaHJiE");
+});
+
+test("Convert external public key to test-net address", () => {
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  const pair = NeuraiKey.getAddressPair("xna-test", mnemonic, 0, 1);
+
+  expect(NeuraiKey.publicKeyToAddress("xna-test", pair.external.publicKey)).toBe(
+    pair.external.address
+  );
 });
 
 test("Validate get public address from Wallet Import Format (WIF) main-net ", () => {

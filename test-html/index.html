@@ -451,6 +451,11 @@
                                     <span class="info-value">${addressPair.external.path}</span>
                                 </div>
                                 <div class="address-info">
+                                    <span class="info-label">Public Key:</span>
+                                    <span class="info-value">${addressPair.external.publicKey}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.external.publicKey}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
                                     <span class="info-label">Private Key:</span>
                                     <span class="info-value">${addressPair.external.privateKey}</span>
                                     <button class="copy-btn" onclick="copiarTexto('${addressPair.external.privateKey}', this)">📋</button>
@@ -477,6 +482,11 @@
                                     <span class="info-value">${addressPair.internal.path}</span>
                                 </div>
                                 <div class="address-info">
+                                    <span class="info-label">Public Key:</span>
+                                    <span class="info-value">${addressPair.internal.publicKey}</span>
+                                    <button class="copy-btn" onclick="copiarTexto('${addressPair.internal.publicKey}', this)">📋</button>
+                                </div>
+                                <div class="address-info">
                                     <span class="info-label">Private Key:</span>
                                     <span class="info-value">${addressPair.internal.privateKey}</span>
                                     <button class="copy-btn" onclick="copiarTexto('${addressPair.internal.privateKey}', this)">📋</button>
@@ -501,7 +511,8 @@
                         - The first 5 addresses (external and internal) have been generated<br>
                         - <strong>External</strong> addresses are used to receive payments<br>
                         - <strong>Internal</strong> addresses are used as change addresses<br>
-                        - Each pair follows the BIP44 standard with path m/44'/175'/0'/change/index${passphraseInfo}
+                        - Each pair follows the BIP44 standard with path m/44'/175'/0'/change/index<br>
+                        - Public keys can be converted back into addresses with <code>NeuraiKey.publicKeyToAddress</code>${passphraseInfo}
                     `;
                     resultsDiv.appendChild(infoDiv);
 

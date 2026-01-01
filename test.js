@@ -97,6 +97,16 @@ test("Validate get public address from Wallet Import Format (WIF) main-net ", ()
   expect(addressObject.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
 });
 
+test("Get compressed public key from Wallet Import Format (WIF) main-net", () => {
+  const network = "xna";
+  const WIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
+  const publicKey = NeuraiKey.getPubkeyByWIF(network, WIF);
+
+  expect(publicKey).toBe(
+    "024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0"
+  );
+});
+
 test("Valid bytes to mnemonic", () => {
   const hexString = "a10a95fb55808c5f15dc97ecbcd26cf0";
   const bytes = Uint8Array.from(Buffer.from(hexString, "hex"));

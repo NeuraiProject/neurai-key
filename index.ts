@@ -133,6 +133,18 @@ export function getAddressByWIF(network: Network, privateKeyWIF: string) {
   };
 }
 
+/**
+ * @param privateKeyWIF
+ * @param network should be "xna" or "xna-test"
+ * @returns the compressed public key as a hex string
+ */
+export function getPubkeyByWIF(network: Network, privateKeyWIF: string): string {
+  const coinKey = CoinKey.fromWif(privateKeyWIF);
+  coinKey.versions = getNetwork(network);
+
+  return coinKey.publicKey.toString("hex");
+}
+
 export const entropyToMnemonic = bip39.entropyToMnemonic;
 
 export function generateAddressObject(
@@ -192,6 +204,7 @@ export default {
   generateMnemonic,
   getAddressByPath,
   getAddressByWIF,
+  getPubkeyByWIF,
   getAddressPair,
   getCoinType,
   getHDKey,

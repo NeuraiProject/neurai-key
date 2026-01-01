@@ -163,6 +163,20 @@ console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
 
 `publicKeyToAddress` throws if the key length is not 33 or 65 bytes so invalid inputs are surfaced immediately.
 
+## Get public key from WIF
+
+If you have a private key in Wallet Import Format (WIF) and want the corresponding compressed public key:
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const network = "xna"; // or "xna-test"
+const wif = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
+
+const pubkeyHex = NeuraiKey.getPubkeyByWIF(network, wif);
+console.log(pubkeyHex);
+```
+
 ## How to import into your project
 
 ### ES6 module

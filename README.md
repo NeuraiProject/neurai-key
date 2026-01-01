@@ -4,6 +4,9 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
+**NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@2.8.5/dist/NeuraiKey.js   
+
 ## Features
 
 - ✅ Generate HD wallets from mnemonic phrases (BIP39)

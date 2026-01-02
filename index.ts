@@ -1,5 +1,6 @@
 //Gives us meta data about coins/chains
-import { chains } from "@hyperbitjs/chains";
+import { chains } from "./coins/xna.js";
+import { chains as legacyChains } from "./coins/xna-legacy.js";
 
 //bip39 from mnemonic to seed
 import * as bip39 from "bip39";
@@ -13,14 +14,17 @@ import { IAddressObject } from "./types";
 const bs58check = require("bs58check");
 
 //Could not declare Network as enum, something wrong with parcel bundler
-export type Network = "xna" | "xna-test";
+export type Network = "xna" | "xna-test" | "xna-legacy" | "xna-legacy-test";
 
 function getNetwork(name: Network) {
   const c = name.toLowerCase() as Network; //Just to be sure
   const chainData = chains as any;
+  const legacyChainData = legacyChains as any;
   const map: Record<Network, any> = {
     xna: chainData.xna.mainnet.versions,
     "xna-test": chainData.xna.testnet?.versions,
+    "xna-legacy": legacyChainData["xna-legacy"].mainnet.versions,
+    "xna-legacy-test": legacyChainData["xna-legacy"].testnet?.versions,
   };
 
   const network = map[c];

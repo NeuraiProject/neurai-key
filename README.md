@@ -14,7 +14,21 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Support for passphrase (25th word) for additional security
 - ✅ Multi-language mnemonic support (English, Spanish, French, Italian, etc.)
 - ✅ Mainnet and Testnet support for Neurai (XNA)
+- ✅ Support for both XNA (BIP44: 1900) and XNA Legacy (BIP44: 0) networks
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
+
+## Network Types
+
+This library supports two Neurai network configurations:
+
+- **`xna` / `xna-test`**: Current Neurai standard (BIP44 coin type: 1900)
+- **`xna-legacy` / `xna-legacy-test`**: Legacy Neurai addresses (BIP44 coin type: 0)
+
+The main difference is the BIP44 derivation path:
+- **XNA**: `m/44'/1900'/0'/0/0` (recommended for new wallets)
+- **XNA Legacy**: `m/44'/0'/0'/0/0` (for compatibility with older wallets)
+
+**Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
 
 ## Example get external and internal (change) addresses by path
@@ -31,7 +45,7 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 const mnemonic = NeuraiKey.generateMnemonic();
 const ACCOUNT = 0; //default is zero
 const POSITION = 1; //the second address for this wallet
-const network = "xna"; //or xna-test for testnet
+const network = "xna"; //or xna-test for testnet, xna-legacy for legacy addresses
 const addressPair = NeuraiKey.getAddressPair(
   network,
   mnemonic,

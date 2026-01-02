@@ -9,7 +9,7 @@ test("Validate address on main-net", () => {
   const network = "xna";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
-  expect(address.external.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+  expect(address.external.address).toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
 });
 
 test("Validate address on test-net", () => {
@@ -25,7 +25,7 @@ test("Validate address with passphrase on main-net", () => {
   const passphrase = "my secret passphrase";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
   // With passphrase, the address should be different from the one without passphrase
-  expect(address.external.address).not.toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+  expect(address.external.address).not.toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
   // Verify it generates consistently with the same passphrase
   const address2 = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
   expect(address.external.address).toBe(address2.external.address);
@@ -51,7 +51,7 @@ test("Empty passphrase equals no passphrase", () => {
   const addressWithoutPassphrase = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
   
   expect(addressWithEmpty.external.address).toBe(addressWithoutPassphrase.external.address);
-  expect(addressWithEmpty.external.address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+  expect(addressWithEmpty.external.address).toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
 });
 
 test("Validate Wallet Import Format (WIF) main-net ", () => {
@@ -59,8 +59,8 @@ test("Validate Wallet Import Format (WIF) main-net ", () => {
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
-  expect(address.internal.address).toBe("NQM5zP6jkwDgCZ2UQiUicW4e3YcWc4NY4S");
-  expect(address.external.WIF).toBe("KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq");
+  expect(address.internal.address).toBe("NRYT7zihLQTGpcK4PKHnTFuQsLaTGJYzqm");
+  expect(address.external.WIF).toBe("L1FXfT3WjVLERgqiQt3YzqU9F3Z8LmMhxPF4VHW5yd3Q6Q66woRQ");
 });
 
 test("Convert external public key to main-net address", () => {

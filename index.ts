@@ -1,6 +1,7 @@
 //Gives us meta data about coins/chains
 import { chains } from "./coins/xna.js";
 import { chains as legacyChains } from "./coins/xna-legacy.js";
+import { pqChains } from "./coins/xna-pq.js";
 
 //bip39 from mnemonic to seed
 import * as bip39 from "bip39";
@@ -10,8 +11,12 @@ const CoinKey = require("coinkey");
 
 //From seed to key
 const HDKey = require("hdkey");
-import { IAddressObject } from "./types";
+import { IAddressObject, IPQAddressObject, PQNetwork } from "./types";
 const bs58check = require("bs58check");
+
+//PostQuantum ML-DSA-44
+const { ml_dsa44 } = require("@noble/post-quantum/ml-dsa.js");
+const { bech32m } = require("bech32");
 
 //Could not declare Network as enum, something wrong with parcel bundler
 export type Network = "xna" | "xna-test" | "xna-legacy" | "xna-legacy-test";
@@ -202,6 +207,117 @@ export function publicKeyToAddress(
 export function generateAddress(network: Network = "xna") {
   return generateAddressObject(network);
 }
+// ==================== PostQuantum ML-DSA-44 ====================
+
+function getPQNetwork(name: PQNetwork) {
+  const pqChainData = pqChains as any;
+  const network = pqChainData[name];
+  if (!network) {
+    throw new Error("PQ network must be 'xna-pq' or 'xna-pq-test'");
+  }
+  return network;
+}
+
+function hash160(data: Buffer | Uint8Array): Buffer {
+  const sha256Hash = createHash("sha256").update(data).digest();
+  return createHash("ripemd160").update(sha256Hash).digest();
+}
+
+function bech32mEncode(hrp: string, witnessVersion: number, hash: Buffer): string {
+  const words = bech32m.toWords(hash);
+  return bech32m.encode(hrp, [witnessVersion, ...words]);
+}
+
+export function getPQHDKey(network: PQNetwork, mnemonic: string, passphrase: string = ""): any {
+  const chain = getPQNetwork(network);
+  const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase).toString("hex");
+  const hdKey = HDKey.fromMasterSeed(Buffer.from(seed, "hex"), chain.bip32);
+  return hdKey;
+}
+
+export function getPQAddressByPath(
+  network: PQNetwork,
+  hdKey: any,
+  path: string
+): IPQAddressObject {
+  const chain = getPQNetwork(network);
+  const derived = hdKey.derive(path);
+  const seed32 = Buffer.from(derived.privateKey);
+
+  const { publicKey, secretKey } = ml_dsa44.keygen(seed32);
+
+  // Serialize pubkey with 0x05 prefix
+  const serialized = Buffer.concat([Buffer.from([0x05]), Buffer.from(publicKey)]);
+  const addrHash = hash160(serialized);
+  const address = bech32mEncode(chain.hrp, chain.witnessVersion, addrHash);
+
+  return {
+    address,
+    path,
+    publicKey: Buffer.from(publicKey).toString("hex"),
+    privateKey: Buffer.from(secretKey).toString("hex"),
+    seedKey: seed32.toString("hex"),
+  };
+}
+
+/**
+ * Generate a PostQuantum ML-DSA-44 address
+ * @param network - "xna-pq" for mainnet, "xna-pq-test" for testnet
+ * @param mnemonic - BIP39 mnemonic
+ * @param account - account index (default 0)
+ * @param index - address index
+ * @param passphrase - optional BIP39 passphrase
+ */
+export function getPQAddress(
+  network: PQNetwork,
+  mnemonic: string,
+  account: number,
+  index: number,
+  passphrase: string = ""
+): IPQAddressObject {
+  const chain = getPQNetwork(network);
+  const hdKey = getPQHDKey(network, mnemonic, passphrase);
+  const path = `m/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}/${index}`;
+  return getPQAddressByPath(network, hdKey, path);
+}
+
+/**
+ * Reconstruct a PostQuantum address from an ML-DSA-44 public key
+ * @param network - "xna-pq" or "xna-pq-test"
+ * @param publicKey - ML-DSA-44 public key (1312 bytes as Buffer, Uint8Array, or hex string)
+ */
+export function pqPublicKeyToAddress(
+  network: PQNetwork,
+  publicKey: Buffer | Uint8Array | string
+): string {
+  const chain = getPQNetwork(network);
+  const keyBuffer = Buffer.isBuffer(publicKey)
+    ? publicKey
+    : typeof publicKey === "string"
+      ? Buffer.from(publicKey, "hex")
+      : Buffer.from(publicKey);
+
+  if (keyBuffer.length !== 1312) {
+    throw new Error("ML-DSA-44 public key must be 1312 bytes");
+  }
+
+  const serialized = Buffer.concat([Buffer.from([0x05]), keyBuffer]);
+  const addrHash = hash160(serialized);
+  return bech32mEncode(chain.hrp, chain.witnessVersion, addrHash);
+}
+
+export function generatePQAddressObject(
+  network: PQNetwork = "xna-pq",
+  passphrase: string = ""
+): IPQAddressObject {
+  const mnemonic = generateMnemonic();
+  const addressObj = getPQAddress(network, mnemonic, 0, 0, passphrase);
+  return {
+    ...addressObj,
+    mnemonic,
+  };
+}
+
 export default {
   entropyToMnemonic,
   generateAddress,
@@ -214,4 +330,10 @@ export default {
   getHDKey,
   isMnemonicValid,
   publicKeyToAddress,
+  // PostQuantum ML-DSA-44
+  getPQAddress,
+  getPQAddressByPath,
+  getPQHDKey,
+  pqPublicKeyToAddress,
+  generatePQAddressObject,
 };

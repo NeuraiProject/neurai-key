@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@2.8.5/dist/NeuraiKey.js   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@2.8.8/dist/NeuraiKey.js   
 
 ## Features
 
@@ -16,17 +16,20 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Mainnet and Testnet support for Neurai (XNA)
 - ✅ Support for both XNA (BIP44: 1900) and XNA Legacy (BIP44: 0) networks
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
+- ✅ PostQuantum addresses using ML-DSA-44 (FIPS 204) with Bech32m encoding
 
 ## Network Types
 
-This library supports two Neurai network configurations:
+This library supports three Neurai network configurations:
 
 - **`xna` / `xna-test`**: Current Neurai standard (BIP44 coin type: 1900)
 - **`xna-legacy` / `xna-legacy-test`**: Legacy Neurai addresses (BIP44 coin type: 0)
+- **`xna-pq` / `xna-pq-test`**: PostQuantum ML-DSA-44 addresses (Bech32m, witness v1)
 
-The main difference is the BIP44 derivation path:
-- **XNA**: `m/44'/1900'/0'/0/0` (recommended for new wallets)
-- **XNA Legacy**: `m/44'/0'/0'/0/0` (for compatibility with older wallets)
+The main difference is the derivation path and address encoding:
+- **XNA**: `m/44'/1900'/0'/0/0` — Base58Check, prefix `N` (recommended for new wallets)
+- **XNA Legacy**: `m/44'/0'/0'/0/0` — Base58Check, prefix `N` (for compatibility with older wallets)
+- **XNA PostQuantum**: `m/100'/1900'/0'/0/0` — Bech32m, prefix `nq1` (for future quantum-resistant fork)
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
@@ -179,6 +182,75 @@ console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
 ```
 
 `publicKeyToAddress` throws if the key length is not 33 or 65 bytes so invalid inputs are surfaced immediately.
+
+## PostQuantum (ML-DSA-44) Addresses
+
+Generate quantum-resistant addresses using the ML-DSA-44 signature scheme (FIPS 204). These addresses use Bech32m encoding with witness version 1, preparing for a future post-quantum fork.
+
+### Generate a PQ address
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const mnemonic = NeuraiKey.generateMnemonic();
+const network = "xna-pq"; // or "xna-pq-test" for testnet
+const ACCOUNT = 0;
+const INDEX = 0;
+
+const pqAddress = NeuraiKey.getPQAddress(network, mnemonic, ACCOUNT, INDEX);
+console.log(pqAddress);
+```
+
+Outputs
+
+```
+{
+  address: 'nq1...',                    // Bech32m address
+  path: "m/100'/1900'/0'/0/0",          // PQ derivation path
+  publicKey: '...',                     // ML-DSA-44 public key (2624 hex chars = 1312 bytes)
+  privateKey: '...',                    // ML-DSA-44 private key (5120 hex chars = 2560 bytes)
+  seedKey: '...'                        // 32-byte BIP32 seed used for ML-DSA keygen (64 hex chars)
+}
+```
+
+### Generate a random PQ wallet
+
+```javascript
+const pqWallet = NeuraiKey.generatePQAddressObject("xna-pq");
+console.log(pqWallet.mnemonic);  // 12-word mnemonic
+console.log(pqWallet.address);   // nq1...
+```
+
+### Reconstruct a PQ address from its public key
+
+```javascript
+const pqAddress = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0);
+const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", pqAddress.publicKey);
+// reconstructed === pqAddress.address
+```
+
+### Advanced: derive by path with HD key reuse
+
+```javascript
+const hdKey = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+const addr0 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/0");
+const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1");
+```
+
+### PQ Address Details
+
+| Property | Value |
+|----------|-------|
+| Signature algorithm | ML-DSA-44 (FIPS 204) |
+| Address encoding | Bech32m (witness version 1) |
+| Mainnet HRP / prefix | `nq` / `nq1...` |
+| Testnet HRP / prefix | `tnq` / `tnq1...` |
+| Public key size | 1312 bytes |
+| Derivation path (mainnet) | `m/100'/1900'/0'/0/index` |
+| Derivation path (testnet) | `m/100'/1900'/0'/1/index` |
+| Address hash | HASH160(0x05 \|\| pubkey) |
+
+**Note**: PQ addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte BIP32-derived seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.
 
 ## Get public key from WIF
 

@@ -1,4 +1,9 @@
-const NeuraiKey = require("./dist/NeuraiKey");
+import { Buffer } from "node:buffer";
+import { createRequire } from "node:module";
+import { describe, expect, it, test } from "vitest";
+
+const require = createRequire(import.meta.url);
+const NeuraiKey = require("./dist/index.cjs");
 
 test("Random mnemonic should contain 12 words", () => {
   const mnemonic = NeuraiKey.generateMnemonic();
@@ -24,9 +29,7 @@ test("Validate address with passphrase on main-net", () => {
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const passphrase = "my secret passphrase";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
-  // With passphrase, the address should be different from the one without passphrase
   expect(address.external.address).not.toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
-  // Verify it generates consistently with the same passphrase
   const address2 = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
   expect(address.external.address).toBe(address2.external.address);
 });
@@ -36,20 +39,20 @@ test("Different passphrases generate different addresses", () => {
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const passphrase1 = "passphrase1";
   const passphrase2 = "passphrase2";
-  
+
   const address1 = NeuraiKey.getAddressPair(network, mnemonic, 0, 0, passphrase1);
   const address2 = NeuraiKey.getAddressPair(network, mnemonic, 0, 0, passphrase2);
-  
+
   expect(address1.external.address).not.toBe(address2.external.address);
 });
 
 test("Empty passphrase equals no passphrase", () => {
   const network = "xna";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-  
+
   const addressWithEmpty = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, "");
   const addressWithoutPassphrase = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
-  
+
   expect(addressWithEmpty.external.address).toBe(addressWithoutPassphrase.external.address);
   expect(addressWithEmpty.external.address).toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
 });
@@ -150,51 +153,35 @@ it("Should accept Italian mnemonic", () => {
 
 describe("generateAddress", () => {
   it("should generate an address with a mnemonic", () => {
-    // Call the function
     const result = NeuraiKey.generateAddressObject();
 
-    // Assertions
     expect(result).toHaveProperty("mnemonic");
     expect(result.mnemonic).toBeDefined();
-    expect(result.network).toBe("xna"); //Test default
-    expect(result).toHaveProperty("address"); // replace 'key' with the actual property you expect in addressObject
-    // ... you can add more assertions based on the expected structure of the result
+    expect(result.network).toBe("xna");
+    expect(result).toHaveProperty("address");
   });
 
   it("default network should be xna for Neurai", () => {
     const network = "xna-test";
-    // Call the function
     const result = NeuraiKey.generateAddressObject(network);
-    // Assertions
-    expect(result.network).toBe(network); //Test default
+    expect(result.network).toBe(network);
   });
 
   it("Should handle xna-test", () => {
     const network = "xna-test";
-    // Call the function
     const result = NeuraiKey.generateAddressObject(network);
-    // Assertions
-    expect(result.network).toBe(network); //Test default
+    expect(result.network).toBe(network);
   });
-
-  // Add more tests if needed to cover different scenarios
 });
-
-// ==================== PostQuantum ML-DSA-44 Tests ====================
 
 describe("PostQuant ML-DSA-44 Addresses", () => {
   test("Test vector: known seed produces expected mainnet address via getPQAddressByPath", () => {
-    // Use a mnemonic that derives the test vector seed at the PQ path
-    // Validate end-to-end that pqPublicKeyToAddress + getPQAddress produce consistent Bech32m addresses
-    // The test vector address nq1p7hqf8nunx8sf87pf0dfw6k9gy9zz0pfg0hqs6y corresponds to
-    // seed 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-    // We verify the pipeline by checking that a generated address can be reconstructed from its public key
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0);
     const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", addr.publicKey);
     expect(addr.address).toBe(reconstructed);
     expect(addr.address.startsWith("nq1")).toBe(true);
-    expect(addr.seedKey.length).toBe(64); // 32 bytes hex
+    expect(addr.seedKey.length).toBe(64);
   });
 
   test("Deterministic PQ address generation from mnemonic", () => {

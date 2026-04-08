@@ -1,6 +1,7 @@
 export interface IAddressObject {
   address: string;
   mnemonic?: string;
+  network?: string;
   path: string;
   publicKey: string;
   privateKey: string;

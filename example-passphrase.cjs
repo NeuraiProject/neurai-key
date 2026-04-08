@@ -1,4 +1,4 @@
-const NeuraiKey = require("./dist/main");
+const NeuraiKey = require("./dist/index.cjs");
 
 console.log("=== Neurai Key - Passphrase Example ===\n");
 

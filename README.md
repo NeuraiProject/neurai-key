@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@2.8.8/dist/NeuraiKey.js   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@3.0.0/dist/NeuraiKey.global.js   
 
 ## Features
 
@@ -40,10 +40,8 @@ A simple and "spot on" way to generate/derive addresses.
 
 If you need brutal performance check out getAddressByPath example below.
 
-```
+```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
-//Or import as CommonsJS module
-//const NeuraiKey = require("@neuraiproject/neurai-key");
 
 const mnemonic = NeuraiKey.generateMnemonic();
 const ACCOUNT = 0; //default is zero
@@ -268,47 +266,58 @@ console.log(pubkeyHex);
 
 ## How to import into your project
 
-### ES6 module
+### ESM default
 
-```
-//As ES6 module
+```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
 ```
 
-### CommonsJS module
+### ESM browser explicit
 
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key/browser";
 ```
-//As CommonsJS module
+
+### CommonJS
+
+```javascript
 const NeuraiKey = require("@neuraiproject/neurai-key");
 ```
 
-### Browserify
+### Global build for HTML
 
-```
-//A browseriy:d version, with all the dependencies bundled for the web
+```html
 <html>
   <body>
-    <script src="./node_modules/@neuraiproject/neurai-key/dist/NeuraiKey.js"></script>
+    <script src="./node_modules/@neuraiproject/neurai-key/dist/NeuraiKey.global.js"></script>
     <script>
-      alert(NeuraiKey.generateMnemonic());
+      alert(globalThis.NeuraiKey.generateMnemonic());
     </script>
   </body>
 </html>
 ```
 
+## Package layout in `3.0.0`
+
+- `dist/index.js`: ESM main entry
+- `dist/index.cjs`: CommonJS entry
+- `dist/browser.js`: explicit browser ESM bundle
+- `dist/NeuraiKey.global.js`: global build for `<script>`
+- `dist/index.d.ts`: TypeScript declarations
+
 ## install
 
-` npm install @neuraiproject/neurai-key`
+`npm install @neuraiproject/neurai-key`
 
 ## build
 
-` npm run build`
+`npm run build`
 
 ## test
 
 `npm test`
 
-Note, the tests run on the built version, so you need to build before you run the tests
+The test script already builds the package before running Jest.
 
 ## BIP32
 

@@ -27,9 +27,9 @@ This library supports three Neurai network configurations:
 - **`xna-pq` / `xna-pq-test`**: PostQuantum ML-DSA-44 addresses (Bech32m, witness v1)
 
 The main difference is the derivation path and address encoding:
-- **XNA**: `m/44'/1900'/0'/0/0` — Base58Check, prefix `N` (recommended for new wallets)
-- **XNA Legacy**: `m/44'/0'/0'/0/0` — Base58Check, prefix `N` (for compatibility with older wallets)
-- **XNA PostQuantum**: `m/100'/1900'/0'/0/0` — Bech32m, prefix `nq1` (for future quantum-resistant fork)
+- **XNA**: mainnet `m/44'/1900'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (recommended for new wallets)
+- **XNA Legacy**: mainnet `m/44'/0'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (for compatibility with older wallets)
+- **XNA PostQuantum**: mainnet `m/100'/1900'/0'/0/0`, testnet default/external `m/100'/1'/0'/0/0` — Bech32m (`nq1` / `tnq1`)
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
@@ -199,6 +199,8 @@ const pqAddress = NeuraiKey.getPQAddress(network, mnemonic, ACCOUNT, INDEX);
 console.log(pqAddress);
 ```
 
+`getPQAddress()` returns the external branch by default.
+
 Outputs
 
 ```
@@ -245,7 +247,7 @@ const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1
 | Testnet HRP / prefix | `tnq` / `tnq1...` |
 | Public key size | 1312 bytes |
 | Derivation path (mainnet) | `m/100'/1900'/0'/0/index` |
-| Derivation path (testnet) | `m/100'/1900'/0'/1/index` |
+| Derivation path (testnet default/external) | `m/100'/1'/account'/0/index` |
 | Address hash | HASH160(0x05 \|\| pubkey) |
 
 **Note**: PQ addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte BIP32-derived seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.

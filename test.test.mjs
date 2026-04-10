@@ -211,10 +211,17 @@ describe("PostQuant ML-DSA-44 Addresses", () => {
     expect(addr.path).toBe("m/100'/1900'/0'/0/5");
   });
 
-  test("Testnet path uses changeIndex 1", () => {
+  test("Testnet PQ default path uses coinType 1 and external branch 0", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 3);
-    expect(addr.path).toBe("m/100'/1900'/0'/1/3");
+    expect(addr.path).toBe("m/100'/1'/0'/0/3");
+  });
+
+  test("Testnet PQ internal branch uses change index 1 by explicit path", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const hdKey = NeuraiKey.getPQHDKey("xna-pq-test", mnemonic);
+    const addr = NeuraiKey.getPQAddressByPath("xna-pq-test", hdKey, "m/100'/1'/0'/1/3");
+    expect(addr.path).toBe("m/100'/1'/0'/1/3");
   });
 
   test("pqPublicKeyToAddress matches generated address", () => {

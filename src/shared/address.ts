@@ -2,11 +2,14 @@ import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { bech32m } from "bech32";
 import { base58CheckDecode, base58CheckEncode, bytesToHex, concatBytes, ensureBytes, hash160, sha256Hash, taggedHash } from "./bytes.js";
 import type { AddressVersions, PQNetworkConfig } from "./networks.js";
-import type { PQAddressOptions } from "../../types.js";
+import type { AuthScriptOptions, AuthType, PQAddressOptions } from "../../types.js";
 
 const AUTHSCRIPT_TAG = "NeuraiAuthScript";
 const AUTHSCRIPT_VERSION = 0x01;
+const NOAUTH_TYPE = 0x00;
 const PQ_AUTH_TYPE = 0x01;
+const LEGACY_AUTH_TYPE = 0x02;
+const PQ_PUBLIC_KEY_HEADER = Uint8Array.from([0x05]);
 const DEFAULT_WITNESS_SCRIPT = Uint8Array.from([0x51]);
 
 export function encodeWIF(privateKey: Uint8Array, version: number, compressed = true): string {
@@ -82,17 +85,41 @@ export function normalizeWitnessScript(input?: Uint8Array | string): Uint8Array 
   return input ? ensureBytes(input) : Uint8Array.from(DEFAULT_WITNESS_SCRIPT);
 }
 
+export function buildAuthDescriptor(authType: AuthType, publicKey: Uint8Array | null): Uint8Array {
+  if (authType === NOAUTH_TYPE) {
+    return Uint8Array.from([NOAUTH_TYPE]);
+  }
+
+  if (!publicKey) {
+    throw new Error(`Auth type 0x${authType.toString(16).padStart(2, "0")} requires a public key`);
+  }
+
+  if (authType === PQ_AUTH_TYPE) {
+    return concatBytes(Uint8Array.from([PQ_AUTH_TYPE]), hash160(concatBytes(PQ_PUBLIC_KEY_HEADER, publicKey)));
+  }
+
+  if (authType === LEGACY_AUTH_TYPE) {
+    return concatBytes(Uint8Array.from([LEGACY_AUTH_TYPE]), hash160(publicKey));
+  }
+
+  throw new Error(`Unsupported authType: 0x${String(authType).padStart(2, "0")}`);
+}
+
 export function pqPublicKeyToAuthDescriptor(publicKey: Uint8Array): Uint8Array {
-  return concatBytes(Uint8Array.from([PQ_AUTH_TYPE]), hash160(publicKey));
+  return buildAuthDescriptor(PQ_AUTH_TYPE, publicKey);
 }
 
 export function pqPublicKeyToCommitment(publicKey: Uint8Array, options: PQAddressOptions = {}): Uint8Array {
   return pqPublicKeyToCommitmentParts(publicKey, options).commitment;
 }
 
-export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array, options: PQAddressOptions = {}) {
+export function authScriptCommitmentParts(
+  authType: AuthType,
+  publicKey: Uint8Array | null,
+  options: AuthScriptOptions = {},
+) {
   const witnessScript = normalizeWitnessScript(options.witnessScript);
-  const authDescriptor = pqPublicKeyToAuthDescriptor(publicKey);
+  const authDescriptor = buildAuthDescriptor(authType, publicKey);
   const witnessScriptHash = sha256Hash(witnessScript);
   const commitment = taggedHash(
     AUTHSCRIPT_TAG,
@@ -105,14 +132,34 @@ export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array, options: PQA
 
   return {
     authDescriptor,
-    authType: PQ_AUTH_TYPE,
+    authType,
     commitment,
     witnessScript,
   };
 }
 
+export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array, options: PQAddressOptions = {}) {
+  return authScriptCommitmentParts(PQ_AUTH_TYPE, publicKey, options);
+}
+
 export function pqPublicKeyToAddressBytes(publicKey: Uint8Array, network: PQNetworkConfig, options: PQAddressOptions = {}): string {
   return bech32mEncode(network.hrp, network.witnessVersion, pqPublicKeyToCommitment(publicKey, options));
+}
+
+export function noAuthToAddressBytes(network: PQNetworkConfig, options: AuthScriptOptions = {}): string {
+  return bech32mEncode(network.hrp, network.witnessVersion, authScriptCommitmentParts(NOAUTH_TYPE, null, options).commitment);
+}
+
+export function legacyAuthScriptToAddressBytes(
+  publicKey: Uint8Array,
+  network: PQNetworkConfig,
+  options: AuthScriptOptions = {},
+): string {
+  return bech32mEncode(
+    network.hrp,
+    network.witnessVersion,
+    authScriptCommitmentParts(LEGACY_AUTH_TYPE, publicKey, options).commitment,
+  );
 }
 
 export function normalizePublicKey(input: Uint8Array | string): Uint8Array {

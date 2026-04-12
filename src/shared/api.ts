@@ -15,12 +15,44 @@ import { wordlist as spanishWordlist } from "@scure/bip39/wordlists/spanish.js";
 import { wordlist as simplifiedChineseWordlist } from "@scure/bip39/wordlists/simplified-chinese.js";
 import { ml_dsa44 } from "@noble/post-quantum/ml-dsa.js";
 import { bytesToHex, ensureBytes, mnemonicToSeedBytes } from "./bytes.js";
-import { addressObjectFromWIF, normalizePublicKey, normalizeWitnessScript, pqPublicKeyToAddressBytes, pqPublicKeyToAuthDescriptor, pqPublicKeyToCommitment, pqPublicKeyToCommitmentParts, privateKeyToAddressObject, publicKeyHexFromWIF, publicKeyToAddressBytes } from "./address.js";
+import {
+  addressObjectFromWIF,
+  authScriptCommitmentParts,
+  legacyAuthScriptToAddressBytes,
+  noAuthToAddressBytes,
+  normalizePublicKey,
+  normalizeWitnessScript,
+  pqPublicKeyToAddressBytes,
+  pqPublicKeyToAuthDescriptor,
+  pqPublicKeyToCommitment,
+  pqPublicKeyToCommitmentParts,
+  privateKeyToAddressObject,
+  publicKeyHexFromWIF,
+  publicKeyToAddressBytes,
+} from "./address.js";
 import { HDKey } from "./hdkey.js";
-import { getNetwork, getPQNetwork, type IAddressObject, type IPQAddressObject, type Network, type PQNetwork } from "./networks.js";
-import type { PQAddressOptions } from "../../types.js";
+import {
+  getNetwork,
+  getPQNetwork,
+  type IAddressObject,
+  type ILegacyAuthScriptAddressObject,
+  type INoAuthAddressObject,
+  type IPQAddressObject,
+  type Network,
+  type PQNetwork,
+} from "./networks.js";
+import type { AuthScriptOptions, PQAddressOptions } from "../../types.js";
 
-export type { IAddressObject, IPQAddressObject, Network, PQAddressOptions, PQNetwork };
+export type {
+  IAddressObject,
+  ILegacyAuthScriptAddressObject,
+  INoAuthAddressObject,
+  IPQAddressObject,
+  Network,
+  AuthScriptOptions,
+  PQAddressOptions,
+  PQNetwork,
+};
 
 const mnemonicWordlists = [
   czechWordlist,
@@ -134,7 +166,7 @@ export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: strin
 
   return {
     address: pqPublicKeyToAddressBytes(publicKey, chain, options),
-    authType: authScript.authType,
+    authType: 0x01,
     authDescriptor: bytesToHex(authScript.authDescriptor),
     commitment: bytesToHex(authScript.commitment),
     path,
@@ -142,6 +174,77 @@ export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: strin
     privateKey: bytesToHex(secretKey),
     seedKey: bytesToHex(seed32),
     witnessScript: bytesToHex(authScript.witnessScript),
+  };
+}
+
+export function getNoAuthAddress(network: PQNetwork, options: AuthScriptOptions = {}): INoAuthAddressObject {
+  const chain = getPQNetwork(network);
+  const parts = authScriptCommitmentParts(0x00, null, options);
+
+  return {
+    address: noAuthToAddressBytes(chain, options),
+    authType: 0x00,
+    commitment: bytesToHex(parts.commitment),
+    witnessScript: bytesToHex(parts.witnessScript),
+  };
+}
+
+export function getLegacyAuthScriptAddress(
+  network: PQNetwork,
+  legacyNetwork: Network,
+  mnemonic: string,
+  account: number,
+  index: number,
+  passphrase = "",
+  options: AuthScriptOptions = {},
+): ILegacyAuthScriptAddressObject {
+  const pqChain = getPQNetwork(network);
+  const legacyChain = getNetwork(legacyNetwork);
+  const coinType = legacyChain.bip44;
+  const hdKey = getHDKey(legacyNetwork, mnemonic, passphrase);
+  const path = `m/44'/${coinType}'/${account}'/0/${index}`;
+  const derived = hdKey.derive(path);
+
+  if (!derived.privateKey) {
+    throw new Error("Could not derive private key for path");
+  }
+
+  const legacyObject = privateKeyToAddressObject(derived.privateKey, legacyChain, path);
+  const publicKeyBytes = ensureBytes(legacyObject.publicKey);
+  const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
+
+  return {
+    address: legacyAuthScriptToAddressBytes(publicKeyBytes, pqChain, options),
+    path,
+    publicKey: legacyObject.publicKey,
+    privateKey: legacyObject.privateKey,
+    WIF: legacyObject.WIF,
+    authType: 0x02,
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
+    witnessScript: bytesToHex(parts.witnessScript),
+  };
+}
+
+export function getLegacyAuthScriptAddressByWIF(
+  network: PQNetwork,
+  wif: string,
+  options: AuthScriptOptions = {},
+): ILegacyAuthScriptAddressObject {
+  const pqChain = getPQNetwork(network);
+  const publicKeyHex = publicKeyHexFromWIF(wif);
+  const publicKeyBytes = ensureBytes(publicKeyHex);
+  const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
+
+  return {
+    address: legacyAuthScriptToAddressBytes(publicKeyBytes, pqChain, options),
+    publicKey: publicKeyHex,
+    privateKey: "",
+    WIF: wif,
+    authType: 0x02,
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
+    witnessScript: bytesToHex(parts.witnessScript),
   };
 }
 
@@ -211,6 +314,9 @@ const NeuraiKey = {
   getPQAddress,
   getPQAddressByPath,
   getPQHDKey,
+  getNoAuthAddress,
+  getLegacyAuthScriptAddress,
+  getLegacyAuthScriptAddressByWIF,
   pqPublicKeyToAddress,
   pqPublicKeyToAuthDescriptorHex,
   pqPublicKeyToCommitmentHex,

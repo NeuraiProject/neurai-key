@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@3.0.0/dist/NeuraiKey.global.js   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@3.1.0/dist/NeuraiKey.global.js   
 
 ## Features
 
@@ -16,7 +16,16 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Mainnet and Testnet support for Neurai (XNA)
 - ✅ Support for both XNA (BIP44: 1900) and XNA Legacy (BIP44: 0) networks
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
-- ✅ PostQuantum AuthScript addresses using ML-DSA-44 (FIPS 204) with Bech32m encoding
+- ✅ AuthScript witness v1 addresses with Bech32m encoding
+- ✅ `authType = 0x00` NoAuth addresses from `witnessScript` only
+- ✅ `authType = 0x01` PostQuantum ML-DSA-44 AuthScript addresses
+- ✅ `authType = 0x02` Legacy secp256k1 AuthScript addresses
+
+## Compatibility Note
+
+Starting in `3.1.0`, PQ AuthScript descriptors are computed as `0x01 || HASH160(0x05 || rawPublicKey)` to match `neurai-sign-transaction` and the node implementation.
+
+This changes PQ AuthScript addresses and commitments compared to older releases of this library. If you previously generated PQ addresses with an older version of `neurai-key`, treat them as legacy outputs and verify fund exposure before migrating.
 
 ## Network Types
 
@@ -24,7 +33,7 @@ This library supports three Neurai network configurations:
 
 - **`xna` / `xna-test`**: Current Neurai standard (BIP44 coin type: 1900)
 - **`xna-legacy` / `xna-legacy-test`**: Legacy Neurai addresses (BIP44 coin type: 0)
-- **`xna-pq` / `xna-pq-test`**: PostQuantum ML-DSA-44 AuthScript addresses (Bech32m, witness v1)
+- **`xna-pq` / `xna-pq-test`**: AuthScript witness v1 addresses (Bech32m, `nq1` / `tnq1`)
 
 The main difference is the derivation path and address encoding:
 - **XNA**: mainnet `m/44'/1900'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (recommended for new wallets)
@@ -185,6 +194,14 @@ console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
 
 Generate quantum-resistant AuthScript addresses using the ML-DSA-44 signature scheme (FIPS 204). The library now follows the migrated `witness v1 = AuthScript` layout, so the Bech32m program is a 32-byte commitment instead of the old 20-byte PQ keyhash.
 
+Supported AuthScript variants:
+
+| `authType` | Name | Description |
+|------------|------|-------------|
+| `0x00` | NoAuth | No signature. Spend path depends only on `witnessScript` |
+| `0x01` | PQ | ML-DSA-44 post-quantum signature |
+| `0x02` | Legacy | secp256k1 signature inside the AuthScript framework |
+
 ### Generate a PQ address
 
 ```javascript
@@ -207,7 +224,7 @@ Outputs
 {
   address: 'nq1...',                    // Bech32m AuthScript address
   authType: 1,                         // 0x01 = PQ single-key auth
-  authDescriptor: '01...',             // 0x01 || HASH160(pq_pubkey)
+  authDescriptor: '01...',             // 0x01 || HASH160(0x05 || pq_pubkey)
   commitment: '...',                   // tagged_hash("NeuraiAuthScript", ...)
   path: "m/100'/1900'/0'/0/0",          // PQ derivation path
   publicKey: '...',                     // ML-DSA-44 public key (2624 hex chars = 1312 bytes)
@@ -244,7 +261,84 @@ console.log(pqAddress.witnessScript); // 5151
 console.log(pqAddress.commitment);    // new 32-byte commitment
 ```
 
-`authType` no es configurable en la API pública. Esta librería genera únicamente direcciones PQ simples con `authType = 0x01`.
+`getPQAddress()` always generates `authType = 0x01` PQ addresses. Use `getNoAuthAddress()` for `0x00` and `getLegacyAuthScriptAddress()` / `getLegacyAuthScriptAddressByWIF()` for `0x02`.
+
+### Generate a NoAuth address
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const noAuth = NeuraiKey.getNoAuthAddress("xna-pq-test");
+
+console.log(noAuth);
+```
+
+Outputs
+
+```javascript
+{
+  address: "tnq1...",
+  authType: 0,
+  commitment: "...",
+  witnessScript: "51"
+}
+```
+
+You can provide a custom `witnessScript`:
+
+```javascript
+const noAuth = NeuraiKey.getNoAuthAddress("xna-pq-test", {
+  witnessScript: "527551"
+});
+```
+
+### Generate a Legacy AuthScript address from mnemonic
+
+This derives a normal secp256k1 key using the selected legacy/current HD network, then wraps it as an AuthScript address using the PQ Bech32m network.
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+
+const legacyAuth = NeuraiKey.getLegacyAuthScriptAddress(
+  "xna-pq-test",
+  "xna-test",
+  mnemonic,
+  0,
+  0
+);
+
+console.log(legacyAuth);
+```
+
+Outputs
+
+```javascript
+{
+  address: "tnq1...",
+  path: "m/44'/1'/0'/0/0",
+  publicKey: "...",                    // compressed secp256k1 pubkey
+  privateKey: "...",
+  WIF: "...",
+  authType: 2,
+  authDescriptor: "02...",
+  commitment: "...",
+  witnessScript: "51"
+}
+```
+
+### Generate a Legacy AuthScript address from WIF
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+const wif = "cVP9mzcDqMzWDhekiKMWKqEy739Cp6rKDT4tbG4wXXVfopMfTiBW";
+const legacyAuth = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-pq-test", wif);
+
+console.log(legacyAuth.address);
+console.log(legacyAuth.publicKey);
+```
 
 ### Advanced: derive by path with HD key reuse
 
@@ -265,7 +359,7 @@ const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1
 | Public key size | 1312 bytes |
 | Derivation path (mainnet) | `m/100'/1900'/0'/0/index` |
 | Derivation path (testnet default/external) | `m/100'/1'/account'/0/index` |
-| Auth descriptor | `0x01 \|\| HASH160(pq_pubkey)` |
+| Auth descriptor | `0x01 \|\| HASH160(0x05 \|\| pq_pubkey)` |
 | Commitment | `tagged_hash("NeuraiAuthScript", 0x01 \|\| auth_descriptor \|\| SHA256(witnessScript))` |
 | Default witnessScript | `OP_TRUE` (`51` in hex) |
 
@@ -318,7 +412,7 @@ const NeuraiKey = require("@neuraiproject/neurai-key");
 </html>
 ```
 
-## Package layout in `3.0.0`
+## Package layout in `3.1.0`
 
 - `dist/index.js`: ESM main entry
 - `dist/index.cjs`: CommonJS entry
@@ -338,7 +432,7 @@ const NeuraiKey = require("@neuraiproject/neurai-key");
 
 `npm test`
 
-The test script already builds the package before running Jest.
+The test script already builds the package before running Vitest.
 
 ## BIP32
 

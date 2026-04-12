@@ -1,4 +1,4 @@
-import { IAddressObject, IPQAddressObject, PQNetwork } from "../../types.js";
+import { IAddressObject, ILegacyAuthScriptAddressObject, INoAuthAddressObject, IPQAddressObject, PQNetwork } from "../../types.js";
 
 export type Network = "xna" | "xna-test" | "xna-legacy" | "xna-legacy-test";
 
@@ -102,4 +102,4 @@ export function getPQNetwork(name: PQNetwork): PQNetworkConfig {
   return network;
 }
 
-export type { IAddressObject, IPQAddressObject, PQNetwork };
+export type { IAddressObject, ILegacyAuthScriptAddressObject, INoAuthAddressObject, IPQAddressObject, PQNetwork };

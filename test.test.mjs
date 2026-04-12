@@ -181,12 +181,12 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
     const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", addr.publicKey);
 
     expect(addr.address).toBe(
-      "nq1plxs4tanxaqxtqy7gf8t7qr94h0askwdnenfgt5a93cqhxp7npvmstlsysj"
+      "nq1pe2gr8awq39r3hhcwtw2p368sq8gz3qq2mwch8jy8r8uxcqwhw28qff08qd"
     );
     expect(addr.commitment).toBe(
-      "f9a155f666e80cb013c849d7e00cb5bbfb0b39b3ccd285d3a58e017307d30b37"
+      "ca9033f5c089471bdf0e5b9418e8f001d028800adbb173c88719f86c01d7728e"
     );
-    expect(addr.authDescriptor).toBe("01493cc750291753be3d2bb4dd915101c0019d961f");
+    expect(addr.authDescriptor).toBe("014378616ec78f0e8a786f154a5906419ee5b698e9");
     expect(addr.witnessScript).toBe("51");
     expect(addr.address).toBe(reconstructed);
     expect(addr.address.startsWith("nq1")).toBe(true);
@@ -212,7 +212,7 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 0);
     expect(addr.address).toBe(
-      "tnq1pkdz4p8y6qkpr73rtrrslspamtxrudrcy5cwtannrx9dcketv8ktqdkprfj"
+      "tnq1p86nuhmhzuu3l9kryeuq4lms873rx22gf2pgrsd02exh8dkynkq8qfg7tfz"
     );
     expect(addr.address.startsWith("tnq1")).toBe(true);
   });
@@ -253,7 +253,7 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
     expect(addr1.commitment).toBe(addr2.commitment);
     expect(addr1.witnessScript).toBe("5151");
     expect(addr1.address).not.toBe(
-      "nq1plxs4tanxaqxtqy7gf8t7qr94h0askwdnenfgt5a93cqhxp7npvmstlsysj"
+      "nq1pe2gr8awq39r3hhcwtw2p368sq8gz3qq2mwch8jy8r8uxcqwhw28qff08qd"
     );
   });
 
@@ -277,5 +277,108 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
     expect(result).toHaveProperty("seedKey");
     expect(result.address.startsWith("nq1")).toBe(true);
     expect(result.mnemonic.split(" ").length).toBe(12);
+  });
+});
+
+describe("NoAuth (authType=0x00) addresses", () => {
+  test("NoAuth address with default witnessScript (OP_TRUE)", () => {
+    const result = NeuraiKey.getNoAuthAddress("xna-pq-test");
+
+    expect(result.authType).toBe(0);
+    expect(result.witnessScript).toBe("51");
+    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.commitment.length).toBe(64);
+  });
+
+  test("NoAuth address is deterministic", () => {
+    const a = NeuraiKey.getNoAuthAddress("xna-pq-test");
+    const b = NeuraiKey.getNoAuthAddress("xna-pq-test");
+    expect(a.address).toBe(b.address);
+    expect(a.commitment).toBe(b.commitment);
+  });
+
+  test("NoAuth with custom witnessScript produces different address", () => {
+    const defaultAddr = NeuraiKey.getNoAuthAddress("xna-pq-test");
+    const customAddr = NeuraiKey.getNoAuthAddress("xna-pq-test", {
+      witnessScript: "527551",
+    });
+
+    expect(defaultAddr.address).not.toBe(customAddr.address);
+    expect(customAddr.witnessScript).toBe("527551");
+  });
+
+  test("NoAuth mainnet address starts with nq1", () => {
+    const result = NeuraiKey.getNoAuthAddress("xna-pq");
+    expect(result.address.startsWith("nq1")).toBe(true);
+  });
+
+  test("NoAuth commitment matches neurai-sign-transaction test vector", () => {
+    const result = NeuraiKey.getNoAuthAddress("xna-pq-test");
+    expect(result.commitment).toBe(
+      "a6c181fcd8137e65528a30e4e2d457b51778238441b8f5dd8911c2084a17ee7b"
+    );
+  });
+});
+
+describe("Legacy AuthScript (authType=0x02) addresses", () => {
+  test("Legacy AuthScript from mnemonic with default witnessScript", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const result = NeuraiKey.getLegacyAuthScriptAddress(
+      "xna-pq-test", "xna-test", mnemonic, 0, 0
+    );
+
+    expect(result.authType).toBe(2);
+    expect(result.witnessScript).toBe("51");
+    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.WIF).toBeDefined();
+    expect(result.publicKey.length).toBe(66);
+  });
+
+  test("Legacy AuthScript is deterministic", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const a = NeuraiKey.getLegacyAuthScriptAddress("xna-pq-test", "xna-test", mnemonic, 0, 0);
+    const b = NeuraiKey.getLegacyAuthScriptAddress("xna-pq-test", "xna-test", mnemonic, 0, 0);
+    expect(a.address).toBe(b.address);
+    expect(a.commitment).toBe(b.commitment);
+    expect(a.WIF).toBe(b.WIF);
+  });
+
+  test("Legacy AuthScript from WIF", () => {
+    const wif = "cVP9mzcDqMzWDhekiKMWKqEy739Cp6rKDT4tbG4wXXVfopMfTiBW";
+    const result = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-pq-test", wif);
+
+    expect(result.authType).toBe(2);
+    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.publicKey).toBe(
+      "02666e9b6aacfa34715c1050e890fa8f07a5e73c70f23abdca585f1506514d81a0"
+    );
+  });
+
+  test("Legacy AuthScript address differs from PQ address with same mnemonic", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const pq = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 0);
+    const legacy = NeuraiKey.getLegacyAuthScriptAddress(
+      "xna-pq-test", "xna-test", mnemonic, 0, 0
+    );
+    expect(pq.address).not.toBe(legacy.address);
+  });
+
+  test("Legacy AuthScript with custom witnessScript", () => {
+    const wif = "cVP9mzcDqMzWDhekiKMWKqEy739Cp6rKDT4tbG4wXXVfopMfTiBW";
+    const defaultAddr = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-pq-test", wif);
+    const customAddr = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-pq-test", wif, {
+      witnessScript: "527551",
+    });
+
+    expect(defaultAddr.address).not.toBe(customAddr.address);
+    expect(customAddr.witnessScript).toBe("527551");
+  });
+
+  test("Legacy AuthScript commitment matches neurai-sign-transaction test vector", () => {
+    const wif = "cVP9mzcDqMzWDhekiKMWKqEy739Cp6rKDT4tbG4wXXVfopMfTiBW";
+    const result = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-pq-test", wif);
+    expect(result.commitment).toBe(
+      "4f3bf4e4647e4d567df289c131a999c67734819cd0901e77569af660d3d17adf"
+    );
   });
 });

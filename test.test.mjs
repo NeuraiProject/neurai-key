@@ -174,11 +174,20 @@ describe("generateAddress", () => {
   });
 });
 
-describe("PostQuant ML-DSA-44 Addresses", () => {
-  test("Test vector: known seed produces expected mainnet address via getPQAddressByPath", () => {
+describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
+  test("Test vector: known seed produces expected mainnet AuthScript address", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0);
     const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", addr.publicKey);
+
+    expect(addr.address).toBe(
+      "nq1plxs4tanxaqxtqy7gf8t7qr94h0askwdnenfgt5a93cqhxp7npvmstlsysj"
+    );
+    expect(addr.commitment).toBe(
+      "f9a155f666e80cb013c849d7e00cb5bbfb0b39b3ccd285d3a58e017307d30b37"
+    );
+    expect(addr.authDescriptor).toBe("01493cc750291753be3d2bb4dd915101c0019d961f");
+    expect(addr.witnessScript).toBe("51");
     expect(addr.address).toBe(reconstructed);
     expect(addr.address.startsWith("nq1")).toBe(true);
     expect(addr.seedKey.length).toBe(64);
@@ -202,6 +211,9 @@ describe("PostQuant ML-DSA-44 Addresses", () => {
   test("Testnet PQ addresses start with tnq1", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 0);
+    expect(addr.address).toBe(
+      "tnq1pkdz4p8y6qkpr73rtrrslspamtxrudrcy5cwtannrx9dcketv8ktqdkprfj"
+    );
     expect(addr.address.startsWith("tnq1")).toBe(true);
   });
 
@@ -229,6 +241,20 @@ describe("PostQuant ML-DSA-44 Addresses", () => {
     const addr = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0);
     const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", addr.publicKey);
     expect(reconstructed).toBe(addr.address);
+  });
+
+  test("Custom witnessScript changes commitment and address deterministically", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const options = { witnessScript: "5151" };
+    const addr1 = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0, "", options);
+    const addr2 = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0, "", options);
+
+    expect(addr1.address).toBe(addr2.address);
+    expect(addr1.commitment).toBe(addr2.commitment);
+    expect(addr1.witnessScript).toBe("5151");
+    expect(addr1.address).not.toBe(
+      "nq1plxs4tanxaqxtqy7gf8t7qr94h0askwdnenfgt5a93cqhxp7npvmstlsysj"
+    );
   });
 
   test("Different passphrases produce different PQ addresses", () => {

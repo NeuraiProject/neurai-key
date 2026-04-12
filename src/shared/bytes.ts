@@ -54,6 +54,15 @@ export function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256(data));
 }
 
+export function sha256Hash(data: Uint8Array): Uint8Array {
+  return sha256(data);
+}
+
+export function taggedHash(tag: string, data: Uint8Array): Uint8Array {
+  const tagHash = sha256(utf8ToBytes(tag));
+  return sha256(concatBytes(tagHash, tagHash, data));
+}
+
 export function doubleSha256(data: Uint8Array): Uint8Array {
   return sha256(sha256(data));
 }
@@ -109,4 +118,3 @@ export function mnemonicToSeedBytes(mnemonicToSeedSync: (mnemonic: string, passw
 }
 
 export const BITCOIN_SEED_KEY = utf8ToBytes("Bitcoin seed");
-export const HASH160_PREFIX = Uint8Array.from([0x05]);

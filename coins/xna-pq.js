@@ -1,6 +1,6 @@
 /**
  * Neurai (XNA) PostQuantum chain configuration data
- * ML-DSA-44 addresses using Bech32m encoding with witness version 1
+ * ML-DSA-44 AuthScript addresses using Bech32m encoding with witness version 1
  */
 
 const xnaPQ = {

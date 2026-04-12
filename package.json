@@ -1,6 +1,6 @@
 {
   "name": "@neuraiproject/neurai-key",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Generate Neurai addresses from mnemonic code. BIP32, BIP39, BIP44",
   "type": "module",
   "main": "./dist/index.cjs",

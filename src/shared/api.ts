@@ -15,11 +15,12 @@ import { wordlist as spanishWordlist } from "@scure/bip39/wordlists/spanish.js";
 import { wordlist as simplifiedChineseWordlist } from "@scure/bip39/wordlists/simplified-chinese.js";
 import { ml_dsa44 } from "@noble/post-quantum/ml-dsa.js";
 import { bytesToHex, ensureBytes, mnemonicToSeedBytes } from "./bytes.js";
-import { addressObjectFromWIF, normalizePublicKey, pqPublicKeyToAddressBytes, privateKeyToAddressObject, publicKeyHexFromWIF, publicKeyToAddressBytes } from "./address.js";
+import { addressObjectFromWIF, normalizePublicKey, normalizeWitnessScript, pqPublicKeyToAddressBytes, pqPublicKeyToAuthDescriptor, pqPublicKeyToCommitment, pqPublicKeyToCommitmentParts, privateKeyToAddressObject, publicKeyHexFromWIF, publicKeyToAddressBytes } from "./address.js";
 import { HDKey } from "./hdkey.js";
 import { getNetwork, getPQNetwork, type IAddressObject, type IPQAddressObject, type Network, type PQNetwork } from "./networks.js";
+import type { PQAddressOptions } from "../../types.js";
 
-export type { IAddressObject, IPQAddressObject, Network, PQNetwork };
+export type { IAddressObject, IPQAddressObject, Network, PQAddressOptions, PQNetwork };
 
 const mnemonicWordlists = [
   czechWordlist,
@@ -120,7 +121,7 @@ export function getPQHDKey(network: PQNetwork, mnemonic: string, passphrase = ""
   return HDKey.fromMasterSeed(seed, chain.bip32);
 }
 
-export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: string): IPQAddressObject {
+export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: string, options: PQAddressOptions = {}): IPQAddressObject {
   const chain = getPQNetwork(network);
   const derived = hdKey.derive(path);
   if (!derived.privateKey) {
@@ -129,13 +130,18 @@ export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: strin
 
   const seed32 = Uint8Array.from(derived.privateKey);
   const { publicKey, secretKey } = ml_dsa44.keygen(seed32);
+  const authScript = pqPublicKeyToCommitmentParts(publicKey, options);
 
   return {
-    address: pqPublicKeyToAddressBytes(publicKey, chain),
+    address: pqPublicKeyToAddressBytes(publicKey, chain, options),
+    authType: authScript.authType,
+    authDescriptor: bytesToHex(authScript.authDescriptor),
+    commitment: bytesToHex(authScript.commitment),
     path,
     publicKey: bytesToHex(publicKey),
     privateKey: bytesToHex(secretKey),
     seedKey: bytesToHex(seed32),
+    witnessScript: bytesToHex(authScript.witnessScript),
   };
 }
 
@@ -145,24 +151,44 @@ export function getPQAddress(
   account: number,
   index: number,
   passphrase = "",
+  options: PQAddressOptions = {},
 ): IPQAddressObject {
   const chain = getPQNetwork(network);
   const hdKey = getPQHDKey(network, mnemonic, passphrase);
   const path = `m/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}/${index}`;
-  return getPQAddressByPath(network, hdKey, path);
+  return getPQAddressByPath(network, hdKey, path, options);
 }
 
-export function pqPublicKeyToAddress(network: PQNetwork, publicKey: Uint8Array | string): string {
+export function pqPublicKeyToAddress(network: PQNetwork, publicKey: Uint8Array | string, options: PQAddressOptions = {}): string {
   const keyBytes = ensureBytes(publicKey);
   if (keyBytes.length !== 1312) {
     throw new Error("ML-DSA-44 public key must be 1312 bytes");
   }
-  return pqPublicKeyToAddressBytes(keyBytes, getPQNetwork(network));
+  normalizeWitnessScript(options.witnessScript);
+  return pqPublicKeyToAddressBytes(keyBytes, getPQNetwork(network), options);
 }
 
-export function generatePQAddressObject(network: PQNetwork = "xna-pq", passphrase = ""): IPQAddressObject {
+export function pqPublicKeyToCommitmentHex(publicKey: Uint8Array | string, options: PQAddressOptions = {}): string {
+  const keyBytes = ensureBytes(publicKey);
+  if (keyBytes.length !== 1312) {
+    throw new Error("ML-DSA-44 public key must be 1312 bytes");
+  }
+
+  return bytesToHex(pqPublicKeyToCommitment(keyBytes, options));
+}
+
+export function pqPublicKeyToAuthDescriptorHex(publicKey: Uint8Array | string): string {
+  const keyBytes = ensureBytes(publicKey);
+  if (keyBytes.length !== 1312) {
+    throw new Error("ML-DSA-44 public key must be 1312 bytes");
+  }
+
+  return bytesToHex(pqPublicKeyToAuthDescriptor(keyBytes));
+}
+
+export function generatePQAddressObject(network: PQNetwork = "xna-pq", passphrase = "", options: PQAddressOptions = {}): IPQAddressObject {
   const mnemonic = generateMnemonic();
-  const addressObj = getPQAddress(network, mnemonic, 0, 0, passphrase);
+  const addressObj = getPQAddress(network, mnemonic, 0, 0, passphrase, options);
   return {
     ...addressObj,
     mnemonic,
@@ -186,6 +212,8 @@ const NeuraiKey = {
   getPQAddressByPath,
   getPQHDKey,
   pqPublicKeyToAddress,
+  pqPublicKeyToAuthDescriptorHex,
+  pqPublicKeyToCommitmentHex,
   generatePQAddressObject,
 };
 

@@ -1,7 +1,13 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { bech32m } from "bech32";
-import { base58CheckDecode, base58CheckEncode, bytesToHex, concatBytes, ensureBytes, HASH160_PREFIX, hash160 } from "./bytes.js";
+import { base58CheckDecode, base58CheckEncode, bytesToHex, concatBytes, ensureBytes, hash160, sha256Hash, taggedHash } from "./bytes.js";
 import type { AddressVersions, PQNetworkConfig } from "./networks.js";
+import type { PQAddressOptions } from "../../types.js";
+
+const AUTHSCRIPT_TAG = "NeuraiAuthScript";
+const AUTHSCRIPT_VERSION = 0x01;
+const PQ_AUTH_TYPE = 0x01;
+const DEFAULT_WITNESS_SCRIPT = Uint8Array.from([0x51]);
 
 export function encodeWIF(privateKey: Uint8Array, version: number, compressed = true): string {
   const payload = compressed
@@ -72,9 +78,41 @@ export function bech32mEncode(hrp: string, witnessVersion: number, hash: Uint8Ar
   return bech32m.encode(hrp, [witnessVersion, ...bech32m.toWords(hash)]);
 }
 
-export function pqPublicKeyToAddressBytes(publicKey: Uint8Array, network: PQNetworkConfig): string {
-  const serialized = concatBytes(HASH160_PREFIX, publicKey);
-  return bech32mEncode(network.hrp, network.witnessVersion, hash160(serialized));
+export function normalizeWitnessScript(input?: Uint8Array | string): Uint8Array {
+  return input ? ensureBytes(input) : Uint8Array.from(DEFAULT_WITNESS_SCRIPT);
+}
+
+export function pqPublicKeyToAuthDescriptor(publicKey: Uint8Array): Uint8Array {
+  return concatBytes(Uint8Array.from([PQ_AUTH_TYPE]), hash160(publicKey));
+}
+
+export function pqPublicKeyToCommitment(publicKey: Uint8Array, options: PQAddressOptions = {}): Uint8Array {
+  return pqPublicKeyToCommitmentParts(publicKey, options).commitment;
+}
+
+export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array, options: PQAddressOptions = {}) {
+  const witnessScript = normalizeWitnessScript(options.witnessScript);
+  const authDescriptor = pqPublicKeyToAuthDescriptor(publicKey);
+  const witnessScriptHash = sha256Hash(witnessScript);
+  const commitment = taggedHash(
+    AUTHSCRIPT_TAG,
+    concatBytes(
+      Uint8Array.from([AUTHSCRIPT_VERSION]),
+      authDescriptor,
+      witnessScriptHash,
+    ),
+  );
+
+  return {
+    authDescriptor,
+    authType: PQ_AUTH_TYPE,
+    commitment,
+    witnessScript,
+  };
+}
+
+export function pqPublicKeyToAddressBytes(publicKey: Uint8Array, network: PQNetworkConfig, options: PQAddressOptions = {}): string {
+  return bech32mEncode(network.hrp, network.witnessVersion, pqPublicKeyToCommitment(publicKey, options));
 }
 
 export function normalizePublicKey(input: Uint8Array | string): Uint8Array {

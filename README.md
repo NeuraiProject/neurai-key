@@ -16,7 +16,7 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Mainnet and Testnet support for Neurai (XNA)
 - ✅ Support for both XNA (BIP44: 1900) and XNA Legacy (BIP44: 0) networks
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
-- ✅ PostQuantum addresses using ML-DSA-44 (FIPS 204) with Bech32m encoding
+- ✅ PostQuantum AuthScript addresses using ML-DSA-44 (FIPS 204) with Bech32m encoding
 
 ## Network Types
 
@@ -24,7 +24,7 @@ This library supports three Neurai network configurations:
 
 - **`xna` / `xna-test`**: Current Neurai standard (BIP44 coin type: 1900)
 - **`xna-legacy` / `xna-legacy-test`**: Legacy Neurai addresses (BIP44 coin type: 0)
-- **`xna-pq` / `xna-pq-test`**: PostQuantum ML-DSA-44 addresses (Bech32m, witness v1)
+- **`xna-pq` / `xna-pq-test`**: PostQuantum ML-DSA-44 AuthScript addresses (Bech32m, witness v1)
 
 The main difference is the derivation path and address encoding:
 - **XNA**: mainnet `m/44'/1900'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (recommended for new wallets)
@@ -181,9 +181,9 @@ console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
 
 `publicKeyToAddress` throws if the key length is not 33 or 65 bytes so invalid inputs are surfaced immediately.
 
-## PostQuantum (ML-DSA-44) Addresses
+## PostQuantum (ML-DSA-44) AuthScript Addresses
 
-Generate quantum-resistant addresses using the ML-DSA-44 signature scheme (FIPS 204). These addresses use Bech32m encoding with witness version 1, preparing for a future post-quantum fork.
+Generate quantum-resistant AuthScript addresses using the ML-DSA-44 signature scheme (FIPS 204). The library now follows the migrated `witness v1 = AuthScript` layout, so the Bech32m program is a 32-byte commitment instead of the old 20-byte PQ keyhash.
 
 ### Generate a PQ address
 
@@ -205,11 +205,15 @@ Outputs
 
 ```
 {
-  address: 'nq1...',                    // Bech32m address
+  address: 'nq1...',                    // Bech32m AuthScript address
+  authType: 1,                         // 0x01 = PQ single-key auth
+  authDescriptor: '01...',             // 0x01 || HASH160(pq_pubkey)
+  commitment: '...',                   // tagged_hash("NeuraiAuthScript", ...)
   path: "m/100'/1900'/0'/0/0",          // PQ derivation path
   publicKey: '...',                     // ML-DSA-44 public key (2624 hex chars = 1312 bytes)
   privateKey: '...',                    // ML-DSA-44 private key (5120 hex chars = 2560 bytes)
-  seedKey: '...'                        // 32-byte BIP32 seed used for ML-DSA keygen (64 hex chars)
+  seedKey: '...',                       // 32-byte BIP32 seed used for ML-DSA keygen (64 hex chars)
+  witnessScript: '51'                   // default OP_TRUE script for simple PQ auth
 }
 ```
 
@@ -229,6 +233,19 @@ const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", pqAddress.publicK
 // reconstructed === pqAddress.address
 ```
 
+### Custom AuthScript witnessScript
+
+```javascript
+const pqAddress = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0, "", {
+  witnessScript: "5151"
+});
+
+console.log(pqAddress.witnessScript); // 5151
+console.log(pqAddress.commitment);    // new 32-byte commitment
+```
+
+`authType` no es configurable en la API pública. Esta librería genera únicamente direcciones PQ simples con `authType = 0x01`.
+
 ### Advanced: derive by path with HD key reuse
 
 ```javascript
@@ -237,20 +254,22 @@ const addr0 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/0
 const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1");
 ```
 
-### PQ Address Details
+### PQ AuthScript Details
 
 | Property | Value |
 |----------|-------|
 | Signature algorithm | ML-DSA-44 (FIPS 204) |
-| Address encoding | Bech32m (witness version 1) |
+| Address encoding | Bech32m (`witness v1` AuthScript) |
 | Mainnet HRP / prefix | `nq` / `nq1...` |
 | Testnet HRP / prefix | `tnq` / `tnq1...` |
 | Public key size | 1312 bytes |
 | Derivation path (mainnet) | `m/100'/1900'/0'/0/index` |
 | Derivation path (testnet default/external) | `m/100'/1'/account'/0/index` |
-| Address hash | HASH160(0x05 \|\| pubkey) |
+| Auth descriptor | `0x01 \|\| HASH160(pq_pubkey)` |
+| Commitment | `tagged_hash("NeuraiAuthScript", 0x01 \|\| auth_descriptor \|\| SHA256(witnessScript))` |
+| Default witnessScript | `OP_TRUE` (`51` in hex) |
 
-**Note**: PQ addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte BIP32-derived seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.
+**Note**: PQ AuthScript addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte BIP32-derived seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.
 
 ## Get public key from WIF
 

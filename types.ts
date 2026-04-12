@@ -8,6 +8,10 @@ export interface IAddressObject {
   WIF: string;
 }
 
+export interface PQAddressOptions {
+  witnessScript?: Uint8Array | string;
+}
+
 export interface IPQAddressObject {
   address: string;
   mnemonic?: string;
@@ -15,6 +19,10 @@ export interface IPQAddressObject {
   publicKey: string;
   privateKey: string;
   seedKey: string;
+  authType: number;
+  authDescriptor: string;
+  commitment: string;
+  witnessScript: string;
 }
 
 export type PQNetwork = "xna-pq" | "xna-pq-test";

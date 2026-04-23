@@ -1,9 +1,12 @@
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { ml_dsa44 } from "@noble/post-quantum/ml-dsa.js";
-import { concatBytes, HARDENED_OFFSET, hash160, hmacSha512, uint32ToBytesBE } from "./bytes.js";
+import { base58CheckDecode, base58CheckEncode, concatBytes, HARDENED_OFFSET, hash160, hmacSha512, uint32ToBytesBE } from "./bytes.js";
 
 const PQ_SEED_KEY = utf8ToBytes("Neurai PQ seed");
 const PQ_PUBLIC_KEY_HEADER = 0x05;
+// 74-byte layout, padded to match BIP32 xprv so base58check yields "xpqp..."/"tpqp...":
+// depth(1) + fingerprint(4) + child(4) + chaincode(32) + padding(1=0x00) + pq_seed(32)
+export const BIP32_PQ_EXTKEY_SIZE = 74;
 
 export class PQHDKey {
   readonly depth: number;
@@ -61,6 +64,57 @@ export class PQHDKey {
     );
     const I = hmacSha512(this.chainCode, data);
     return new PQHDKey(this.depth + 1, index >>> 0, this.fingerprint, I.slice(32, 64), I.slice(0, 32));
+  }
+
+  encode(): Uint8Array {
+    const out = new Uint8Array(BIP32_PQ_EXTKEY_SIZE);
+    out[0] = this.depth & 0xff;
+    out.set(this.parentFingerprint, 1);
+    out[5] = (this.index >>> 24) & 0xff;
+    out[6] = (this.index >>> 16) & 0xff;
+    out[7] = (this.index >>> 8) & 0xff;
+    out[8] = this.index & 0xff;
+    out.set(this.chainCode, 9);
+    out[41] = 0x00; // padding byte (aligns layout with BIP32 xprv)
+    out.set(this.pqSeed, 42);
+    return out;
+  }
+
+  encodeBase58Check(version: number): string {
+    const versionBytes = Uint8Array.from([
+      (version >>> 24) & 0xff,
+      (version >>> 16) & 0xff,
+      (version >>> 8) & 0xff,
+      version & 0xff,
+    ]);
+    return base58CheckEncode(concatBytes(versionBytes, this.encode()));
+  }
+
+  static decode(raw: Uint8Array, parentFingerprint?: Uint8Array): PQHDKey {
+    if (raw.length !== BIP32_PQ_EXTKEY_SIZE) {
+      throw new Error(`PQ extended key payload must be ${BIP32_PQ_EXTKEY_SIZE} bytes`);
+    }
+    if (raw[41] !== 0x00) {
+      throw new Error("PQ extended key padding byte (offset 41) must be 0x00");
+    }
+    const depth = raw[0];
+    const fingerprint = parentFingerprint ?? raw.slice(1, 5);
+    const index = ((raw[5] << 24) | (raw[6] << 16) | (raw[7] << 8) | raw[8]) >>> 0;
+    const chainCode = raw.slice(9, 41);
+    const pqSeed = raw.slice(42, 74);
+    return new PQHDKey(depth, index, Uint8Array.from(fingerprint.slice(0, 4)), chainCode, pqSeed);
+  }
+
+  static decodeBase58Check(extKey: string, expectedVersion: number): PQHDKey {
+    const payload = base58CheckDecode(extKey);
+    if (payload.length !== 4 + BIP32_PQ_EXTKEY_SIZE) {
+      throw new Error("Invalid PQ extended key length");
+    }
+    const version = ((payload[0] << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) >>> 0;
+    if (version !== (expectedVersion >>> 0)) {
+      throw new Error(`PQ extended key version mismatch (expected 0x${expectedVersion.toString(16)}, got 0x${version.toString(16)})`);
+    }
+    return PQHDKey.decode(payload.slice(4));
   }
 
   derive(path: string): PQHDKey {

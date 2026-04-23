@@ -30,7 +30,9 @@ import {
   publicKeyToAddressBytes,
 } from "./address.js";
 import { HDKey } from "./hdkey.js";
-import { PQHDKey } from "./pq-hdkey.js";
+import { BIP32_PQ_EXTKEY_SIZE, PQHDKey } from "./pq-hdkey.js";
+
+export { BIP32_PQ_EXTKEY_SIZE, HDKey, PQHDKey };
 import {
   getNetwork,
   getPQNetwork,
@@ -150,6 +152,14 @@ export function generateAddress(network: Network = "xna") {
 export function getPQHDKey(_network: PQNetwork, mnemonic: string, passphrase = ""): PQHDKey {
   const seed = mnemonicToSeedBytes(mnemonicToSeedSync, mnemonic, passphrase);
   return PQHDKey.fromMasterSeed(seed);
+}
+
+export function pqExtendedPrivateKey(network: PQNetwork, hdKey: PQHDKey): string {
+  return hdKey.encodeBase58Check(getPQNetwork(network).pqExtPrivVersion);
+}
+
+export function pqHDKeyFromExtended(network: PQNetwork, extKey: string): PQHDKey {
+  return PQHDKey.decodeBase58Check(extKey, getPQNetwork(network).pqExtPrivVersion);
 }
 
 export function getPQAddressByPath(network: PQNetwork, hdKey: PQHDKey, path: string, options: PQAddressOptions = {}): IPQAddressObject {
@@ -309,6 +319,8 @@ const NeuraiKey = {
   getPQAddress,
   getPQAddressByPath,
   getPQHDKey,
+  pqExtendedPrivateKey,
+  pqHDKeyFromExtended,
   getNoAuthAddress,
   getLegacyAuthScriptAddress,
   getLegacyAuthScriptAddressByWIF,

@@ -25,7 +25,7 @@ export interface PQNetworkConfig {
   purpose: number;
   coinType: number;
   changeIndex: number;
-  bip32: Bip32Versions;
+  pqExtPrivVersion: number;
 }
 
 const currentNetworks: Record<Network, CurrentNetworkConfig> = {
@@ -74,7 +74,7 @@ const pqNetworks: Record<PQNetwork, PQNetworkConfig> = {
     purpose: 100,
     coinType: 1900,
     changeIndex: 0,
-    bip32: { private: 76066276, public: 76067358 },
+    pqExtPrivVersion: 0x0488ac24, // "xpqp..." prefix, matches Neurai node chainparams.cpp
   },
   "xna-pq-test": {
     hrp: "tnq",
@@ -82,7 +82,7 @@ const pqNetworks: Record<PQNetwork, PQNetworkConfig> = {
     purpose: 100,
     coinType: 1,
     changeIndex: 0,
-    bip32: { private: 70615956, public: 70617039 },
+    pqExtPrivVersion: 0x043581d5, // "tpqp..." prefix, matches Neurai node chainparams.cpp
   },
 };
 

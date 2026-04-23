@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@3.1.0/dist/NeuraiKey.global.js   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@4.0.0/dist/NeuraiKey.global.js   
 
 ## Features
 
@@ -23,9 +23,15 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 ## Compatibility Note
 
-Starting in `3.1.0`, PQ AuthScript descriptors are computed as `0x01 || HASH160(0x05 || rawPublicKey)` to match `neurai-sign-transaction` and the node implementation.
+Starting in `4.0.0`, PQ HD derivation uses a native PQ tree (HMAC-SHA512 with `"Neurai PQ seed"`, all derivation levels hardened, path `m_pq/100'/coin'/0'/0'/index'`). The extended private key format is also updated (prefix `xpqp...` mainnet / `tpqp...` testnet, 74-byte padded layout matching BIP32 xprv length).
 
-This changes PQ AuthScript addresses and commitments compared to older releases of this library. If you previously generated PQ addresses with an older version of `neurai-key`, treat them as legacy outputs and verify fund exposure before migrating.
+These are breaking changes versus `3.x`:
+- PQ addresses produced from the same mnemonic will differ between `3.x` and `4.x`.
+- PQ extended private keys exported by `3.x` (leading `DeG1...` / `Ck5n...`) are not readable by `4.x`.
+
+If you have mnemonics from `3.x`, keep them — the mnemonic is the authoritative backup. Any funds on `3.x` PQ addresses should be moved before upgrading.
+
+Since `3.1.0`, PQ AuthScript descriptors are computed as `0x01 || HASH160(0x05 || rawPublicKey)` to match `neurai-sign-transaction` and the node implementation.
 
 ## Network Types
 
@@ -38,7 +44,7 @@ This library supports three Neurai network configurations:
 The main difference is the derivation path and address encoding:
 - **XNA**: mainnet `m/44'/1900'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (recommended for new wallets)
 - **XNA Legacy**: mainnet `m/44'/0'/0'/0/0`, testnet `m/44'/1'/0'/0/0` — Base58Check (for compatibility with older wallets)
-- **XNA PostQuantum**: mainnet `m/100'/1900'/0'/0/0`, testnet default/external `m/100'/1'/0'/0/0` — Bech32m (`nq1` / `tnq1`)
+- **XNA PostQuantum**: mainnet `m_pq/100'/1900'/0'/0'/0'`, testnet default/external `m_pq/100'/1'/0'/0'/0'` — Bech32m (`nq1` / `tnq1`), native PQ HD tree with hardened-only derivation
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
@@ -226,10 +232,10 @@ Outputs
   authType: 1,                         // 0x01 = PQ single-key auth
   authDescriptor: '01...',             // 0x01 || HASH160(0x05 || pq_pubkey)
   commitment: '...',                   // tagged_hash("NeuraiAuthScript", ...)
-  path: "m/100'/1900'/0'/0/0",          // PQ derivation path
+  path: "m_pq/100'/1900'/0'/0'/0'",     // PQ derivation path (native PQ tree, all hardened)
   publicKey: '...',                     // ML-DSA-44 public key (2624 hex chars = 1312 bytes)
   privateKey: '...',                    // ML-DSA-44 private key (5120 hex chars = 2560 bytes)
-  seedKey: '...',                       // 32-byte BIP32 seed used for ML-DSA keygen (64 hex chars)
+  seedKey: '...',                       // 32-byte native PQ seed used for ML-DSA keygen (64 hex chars)
   witnessScript: '51'                   // default OP_TRUE script for simple PQ auth
 }
 ```
@@ -344,9 +350,27 @@ console.log(legacyAuth.publicKey);
 
 ```javascript
 const hdKey = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
-const addr0 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/0");
-const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1");
+const addr0 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m_pq/100'/1900'/0'/0'/0'");
+const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m_pq/100'/1900'/0'/0'/1'");
 ```
+
+All PQ derivation levels are hardened; a non-hardened segment (`.../0/0`) throws.
+
+### Export / import a PQ extended private key
+
+```javascript
+const hdKey = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+
+// Serialize master (or any subtree) as xpqpriv / tpqpriv
+const xpqpriv = NeuraiKey.pqExtendedPrivateKey("xna-pq", hdKey);
+// xpqpriv starts with "xpqp..." (mainnet) or "tpqp..." (testnet), 111 chars
+
+// Restore from the serialized form and keep deriving
+const restored = NeuraiKey.pqHDKeyFromExtended("xna-pq", xpqpriv);
+const addr = NeuraiKey.getPQAddressByPath("xna-pq", restored, "m_pq/100'/1900'/0'/0'/0'");
+```
+
+The binary layout (74 bytes: `depth + fingerprint + child + chainCode + 0x00 + pq_seed`) and version bytes (`0x0488AC24` mainnet, `0x043581D5` testnet) match the Neurai node's `CNeuraiExtKeyPQ` serialization.
 
 ### PQ AuthScript Details
 
@@ -357,13 +381,15 @@ const addr1 = NeuraiKey.getPQAddressByPath("xna-pq", hdKey, "m/100'/1900'/0'/0/1
 | Mainnet HRP / prefix | `nq` / `nq1...` |
 | Testnet HRP / prefix | `tnq` / `tnq1...` |
 | Public key size | 1312 bytes |
-| Derivation path (mainnet) | `m/100'/1900'/0'/0/index` |
-| Derivation path (testnet default/external) | `m/100'/1'/account'/0/index` |
+| HD tree | Native PQ, HMAC-SHA512 with key `"Neurai PQ seed"`, hardened-only |
+| Derivation path (mainnet) | `m_pq/100'/1900'/0'/0'/index'` |
+| Derivation path (testnet default/external) | `m_pq/100'/1'/0'/0'/index'` |
+| Extended privkey prefix | `xpqp...` (mainnet) / `tpqp...` (testnet), 111 base58 chars |
 | Auth descriptor | `0x01 \|\| HASH160(0x05 \|\| pq_pubkey)` |
 | Commitment | `tagged_hash("NeuraiAuthScript", 0x01 \|\| auth_descriptor \|\| SHA256(witnessScript))` |
 | Default witnessScript | `OP_TRUE` (`51` in hex) |
 
-**Note**: PQ AuthScript addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte BIP32-derived seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.
+**Note**: PQ AuthScript addresses do not have a WIF (Wallet Import Format) field since WIF is specific to secp256k1 keys. The `seedKey` field contains the 32-byte native PQ seed used for deterministic ML-DSA-44 key generation, useful for cross-implementation verification.
 
 ## Get public key from WIF
 
@@ -412,7 +438,7 @@ const NeuraiKey = require("@neuraiproject/neurai-key");
 </html>
 ```
 
-## Package layout in `3.1.0`
+## Package layout in `4.0.0`
 
 - `dist/index.js`: ESM main entry
 - `dist/index.cjs`: CommonJS entry

@@ -286,6 +286,109 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
   });
 });
 
+describe("PQ extended private key (xpqp/tpqp) serialization", () => {
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+
+  // Canonical vector (abandon x11 about, empty passphrase) with the new 74-byte
+  // padded layout. Must match CNeuraiExtKeyPQ::ToString() on the Neurai node.
+  test("Mainnet master xpqpriv canonical vector (node-compatible)", () => {
+    const known = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const hd = NeuraiKey.getPQHDKey("xna-pq", known);
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", hd);
+    expect(ext).toBe(
+      "xpqp18m4AHhPx55uvwXt7MjEda4MhFQwN6HDpErrCjbD1M8XG61G3ARw3VRwQGds3SFrs47RRPt7a5VD7sBocLicvN6R6KD4Je5PEpzj7u5fFtH"
+    );
+    expect(ext.startsWith("xpqp")).toBe(true);
+    expect(ext.length).toBe(111);
+  });
+
+  test("Testnet master tpqpriv canonical vector (node-compatible)", () => {
+    const known = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const hd = NeuraiKey.getPQHDKey("xna-pq-test", known);
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq-test", hd);
+    expect(ext).toBe(
+      "tpqp898ggXX5fM3NCjijZYiKqVPj2NWbMUnHMsT9ZHeMMFtR1Nfy7PH2Bw6meJieZwD6exeL2yPz7BKFp3gR1CZrooYi9uxMzAjcpnb8sse8CYm"
+    );
+    expect(ext.startsWith("tpqp")).toBe(true);
+  });
+
+  test("Mainnet extended key roundtrip preserves pq_seed, chaincode, depth, index", () => {
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const account = hd.derive("m_pq/100'/1900'/0'/0'");
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", account);
+    const recovered = NeuraiKey.pqHDKeyFromExtended("xna-pq", ext);
+
+    expect(recovered.depth).toBe(account.depth);
+    expect(recovered.index).toBe(account.index);
+    expect(Buffer.from(recovered.pqSeed).toString("hex")).toBe(Buffer.from(account.pqSeed).toString("hex"));
+    expect(Buffer.from(recovered.chainCode).toString("hex")).toBe(Buffer.from(account.chainCode).toString("hex"));
+    expect(Buffer.from(recovered.parentFingerprint).toString("hex")).toBe(Buffer.from(account.parentFingerprint).toString("hex"));
+  });
+
+  test("Addresses derived from a recovered extended key match the original", () => {
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const account = hd.derive("m_pq/100'/1900'/0'/0'");
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", account);
+    const recovered = NeuraiKey.pqHDKeyFromExtended("xna-pq", ext);
+
+    const a = NeuraiKey.getPQAddressByPath("xna-pq", account, "m_pq/7'");
+    const b = NeuraiKey.getPQAddressByPath("xna-pq", recovered, "m_pq/7'");
+    expect(a.address).toBe(b.address);
+    expect(a.publicKey).toBe(b.publicKey);
+  });
+
+  test("Wrong network rejects an extended key of the other net", () => {
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", hd);
+    expect(() => NeuraiKey.pqHDKeyFromExtended("xna-pq-test", ext)).toThrow(/version mismatch/i);
+  });
+
+  test("Rejects extended key of wrong length", () => {
+    // Truncate last base58 char → invalid checksum/length
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", hd);
+    const shortened = ext.slice(0, -1);
+    expect(() => NeuraiKey.pqHDKeyFromExtended("xna-pq", shortened)).toThrow();
+  });
+
+  test("Rejects extended key with corrupted checksum", () => {
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const ext = NeuraiKey.pqExtendedPrivateKey("xna-pq", hd);
+    // Flip one char in the middle (keeps length, breaks checksum)
+    const mid = Math.floor(ext.length / 2);
+    const corrupt = ext.slice(0, mid) + (ext[mid] === "A" ? "B" : "A") + ext.slice(mid + 1);
+    expect(() => NeuraiKey.pqHDKeyFromExtended("xna-pq", corrupt)).toThrow();
+  });
+
+  test("Rejects payload with non-zero padding byte", () => {
+    // Craft a 74-byte payload manually with an illegal padding (offset 41 != 0x00),
+    // then base58check-encode with the correct mainnet version so only the padding
+    // check should fail.
+    const hd = NeuraiKey.getPQHDKey("xna-pq", mnemonic);
+    const raw = hd.encode(); // 74 bytes, padding is at index 41 = 0x00
+    const badRaw = Uint8Array.from(raw);
+    badRaw[41] = 0xff; // violate padding invariant
+    // Re-encode base58check with the correct version so only the padding check fails
+    const ver = Uint8Array.from([0x04, 0x88, 0xac, 0x24]);
+    const full = new Uint8Array(ver.length + badRaw.length);
+    full.set(ver, 0);
+    full.set(badRaw, ver.length);
+    // Use library internals: encodeBase58Check uses base58check. We build it via bytesToHex workaround.
+    // Instead, use the base58 module directly through a tiny helper:
+    const { createHash } = require("node:crypto");
+    const d1 = createHash("sha256").update(full).digest();
+    const d2 = createHash("sha256").update(d1).digest();
+    const withChk = Buffer.concat([Buffer.from(full), d2.slice(0, 4)]);
+    const ALPHA = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let n = 0n;
+    for (const b of withChk) n = n * 256n + BigInt(b);
+    let s = "";
+    while (n > 0n) { s = ALPHA[Number(n % 58n)] + s; n /= 58n; }
+    for (const b of withChk) { if (b === 0) s = "1" + s; else break; }
+    expect(() => NeuraiKey.pqHDKeyFromExtended("xna-pq", s)).toThrow(/padding/i);
+  });
+});
+
 describe("NoAuth (authType=0x00) addresses", () => {
   test("NoAuth address with default witnessScript (OP_TRUE)", () => {
     const result = NeuraiKey.getNoAuthAddress("xna-pq-test");

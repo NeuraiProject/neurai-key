@@ -175,18 +175,18 @@ describe("generateAddress", () => {
 });
 
 describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
-  test("Test vector: known seed produces expected mainnet AuthScript address", () => {
+  test("Test vector: known seed produces expected mainnet AuthScript address (NIP-022)", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 0);
     const reconstructed = NeuraiKey.pqPublicKeyToAddress("xna-pq", addr.publicKey);
 
     expect(addr.address).toBe(
-      "nq1pe2gr8awq39r3hhcwtw2p368sq8gz3qq2mwch8jy8r8uxcqwhw28qff08qd"
+      "nq1p5e3g0zyumlt8utualrdsfhnxad9ea9vc3ful3cndx5neh45cj0cqyt49ek"
     );
     expect(addr.commitment).toBe(
-      "ca9033f5c089471bdf0e5b9418e8f001d028800adbb173c88719f86c01d7728e"
+      "a66287889cdfd67e2f9df8db04de66eb4b9e95988a79f8e26d35279bd69893f0"
     );
-    expect(addr.authDescriptor).toBe("014378616ec78f0e8a786f154a5906419ee5b698e9");
+    expect(addr.authDescriptor).toBe("01f969f2877426e5cccf2412fa11a49404b16b40f1");
     expect(addr.witnessScript).toBe("51");
     expect(addr.address).toBe(reconstructed);
     expect(addr.address.startsWith("nq1")).toBe(true);
@@ -212,28 +212,34 @@ describe("PostQuant ML-DSA-44 AuthScript addresses", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 0);
     expect(addr.address).toBe(
-      "tnq1p86nuhmhzuu3l9kryeuq4lms873rx22gf2pgrsd02exh8dkynkq8qfg7tfz"
+      "tnq1pdsj0aztvgwv3rwgml360stpyp228zrggyga6n4sdenmetm6wv3tqzddk95"
     );
     expect(addr.address.startsWith("tnq1")).toBe(true);
   });
 
-  test("Mainnet path uses changeIndex 0", () => {
+  test("Mainnet path follows NIP-022 (m_pq, all hardened)", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq", mnemonic, 0, 5);
-    expect(addr.path).toBe("m/100'/1900'/0'/0/5");
+    expect(addr.path).toBe("m_pq/100'/1900'/0'/0'/5'");
   });
 
-  test("Testnet PQ default path uses coinType 1 and external branch 0", () => {
+  test("Testnet PQ default path uses coinType 1 and hardened external branch 0'", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAddress("xna-pq-test", mnemonic, 0, 3);
-    expect(addr.path).toBe("m/100'/1'/0'/0/3");
+    expect(addr.path).toBe("m_pq/100'/1'/0'/0'/3'");
   });
 
-  test("Testnet PQ internal branch uses change index 1 by explicit path", () => {
+  test("Testnet PQ internal branch uses hardened change index 1' by explicit path", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const hdKey = NeuraiKey.getPQHDKey("xna-pq-test", mnemonic);
-    const addr = NeuraiKey.getPQAddressByPath("xna-pq-test", hdKey, "m/100'/1'/0'/1/3");
-    expect(addr.path).toBe("m/100'/1'/0'/1/3");
+    const addr = NeuraiKey.getPQAddressByPath("xna-pq-test", hdKey, "m_pq/100'/1'/0'/1'/3'");
+    expect(addr.path).toBe("m_pq/100'/1'/0'/1'/3'");
+  });
+
+  test("Non-hardened PQ path is rejected (NIP-022 requires hardened-only)", () => {
+    const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+    const hdKey = NeuraiKey.getPQHDKey("xna-pq-test", mnemonic);
+    expect(() => NeuraiKey.getPQAddressByPath("xna-pq-test", hdKey, "m_pq/100'/1'/0'/0/0")).toThrow();
   });
 
   test("pqPublicKeyToAddress matches generated address", () => {

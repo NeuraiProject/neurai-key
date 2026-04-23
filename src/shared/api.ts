@@ -13,7 +13,6 @@ import { wordlist as koreanWordlist } from "@scure/bip39/wordlists/korean.js";
 import { wordlist as portugueseWordlist } from "@scure/bip39/wordlists/portuguese.js";
 import { wordlist as spanishWordlist } from "@scure/bip39/wordlists/spanish.js";
 import { wordlist as simplifiedChineseWordlist } from "@scure/bip39/wordlists/simplified-chinese.js";
-import { ml_dsa44 } from "@noble/post-quantum/ml-dsa.js";
 import { bytesToHex, ensureBytes, mnemonicToSeedBytes } from "./bytes.js";
 import {
   addressObjectFromWIF,
@@ -31,6 +30,7 @@ import {
   publicKeyToAddressBytes,
 } from "./address.js";
 import { HDKey } from "./hdkey.js";
+import { PQHDKey } from "./pq-hdkey.js";
 import {
   getNetwork,
   getPQNetwork,
@@ -147,21 +147,16 @@ export function generateAddress(network: Network = "xna") {
   return generateAddressObject(network);
 }
 
-export function getPQHDKey(network: PQNetwork, mnemonic: string, passphrase = ""): HDKey {
-  const chain = getPQNetwork(network);
+export function getPQHDKey(_network: PQNetwork, mnemonic: string, passphrase = ""): PQHDKey {
   const seed = mnemonicToSeedBytes(mnemonicToSeedSync, mnemonic, passphrase);
-  return HDKey.fromMasterSeed(seed, chain.bip32);
+  return PQHDKey.fromMasterSeed(seed);
 }
 
-export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: string, options: PQAddressOptions = {}): IPQAddressObject {
+export function getPQAddressByPath(network: PQNetwork, hdKey: PQHDKey, path: string, options: PQAddressOptions = {}): IPQAddressObject {
   const chain = getPQNetwork(network);
   const derived = hdKey.derive(path);
-  if (!derived.privateKey) {
-    throw new Error("Could not derive private key for path");
-  }
-
-  const seed32 = Uint8Array.from(derived.privateKey);
-  const { publicKey, secretKey } = ml_dsa44.keygen(seed32);
+  const publicKey = derived.publicKey;
+  const secretKey = derived.secretKey;
   const authScript = pqPublicKeyToCommitmentParts(publicKey, options);
 
   return {
@@ -172,7 +167,7 @@ export function getPQAddressByPath(network: PQNetwork, hdKey: HDKey, path: strin
     path,
     publicKey: bytesToHex(publicKey),
     privateKey: bytesToHex(secretKey),
-    seedKey: bytesToHex(seed32),
+    seedKey: bytesToHex(derived.pqSeed),
     witnessScript: bytesToHex(authScript.witnessScript),
   };
 }
@@ -258,7 +253,7 @@ export function getPQAddress(
 ): IPQAddressObject {
   const chain = getPQNetwork(network);
   const hdKey = getPQHDKey(network, mnemonic, passphrase);
-  const path = `m/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}/${index}`;
+  const path = `m_pq/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}'/${index}'`;
   return getPQAddressByPath(network, hdKey, path, options);
 }
 

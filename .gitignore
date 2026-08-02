@@ -3,6 +3,7 @@
 # We publish the dist folder to npm, not git
 dist
 test
+tmp/
 
 # Logs
 logs

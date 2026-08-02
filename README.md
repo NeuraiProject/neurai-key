@@ -48,6 +48,8 @@ The main difference is the derivation path and address encoding:
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
+**Regtest**: there is no dedicated `regtest` network — use the `*-test` networks (`xna-test`, `xna-legacy-test`, `xna-pq-test`). The Neurai node shares all address encoding between testnet and regtest: same Base58 prefixes, same BIP44 coin type (1), same Bech32m HRP (`tnq`) and same extended key versions (`tprv`/`tpub`/`tpqp`), so keys and addresses generated for testnet are directly valid on a regtest node.
+
 
 ## Example get external and internal (change) addresses by path
 

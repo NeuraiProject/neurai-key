@@ -3,7 +3,7 @@ const NeuraiKey = require("./dist/index.cjs");
 console.log("=== Neurai Key - Passphrase Example ===\n");
 
 const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-const network = "xna";
+const network = "xna-legacy"; // Base58; "xna" gives ECDSA witness v3 (nq1r...)
 const account = 0;
 const position = 0;
 

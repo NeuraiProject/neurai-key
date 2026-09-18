@@ -22,6 +22,7 @@ import {
   decodeWIF,
   ecdsaPublicKeyToAddressBytes,
   ecdsaPublicKeyToCommitmentParts,
+  secp256k1PublicKeyToAddressBytes,
   encodeWIF,
   getCompressedPublicKey,
   normalizePublicKey,
@@ -29,9 +30,7 @@ import {
   pqPublicKeyToAddressBytes,
   pqPublicKeyToAuthDescriptor,
   pqPublicKeyToCommitmentParts,
-  privateKeyToAddressObject,
   publicKeyHexFromWIF,
-  publicKeyToAddressBytes,
 } from "./address.js";
 import { HDKey } from "./hdkey.js";
 import { BIP32_PQ_EXTKEY_SIZE, PQHDKey } from "./pq-hdkey.js";
@@ -39,28 +38,23 @@ import { BIP32_PQ_EXTKEY_SIZE, PQHDKey } from "./pq-hdkey.js";
 export { BIP32_PQ_EXTKEY_SIZE, HDKey, PQHDKey };
 import {
   getAuthScriptNetwork,
-  getECDSANetwork,
   getNetwork,
   getPQNetwork,
   type AuthScriptNetwork,
-  type ECDSANetwork,
-  type ECDSANetworkConfig,
   type IAddressObject,
-  type IECDSAAddressObject,
   type ILegacyAuthScriptAddressObject,
   type INoAuthAddressObject,
   type IPQAddressObject,
   type IPQAuthScriptAddressObject,
   type Network,
   type PQNetwork,
+  type Secp256k1NetworkConfig,
 } from "./networks.js";
 import type { AuthScriptOptions, PQAddressOptions } from "../../types.js";
 
 export type {
   AuthScriptNetwork,
-  ECDSANetwork,
   IAddressObject,
-  IECDSAAddressObject,
   ILegacyAuthScriptAddressObject,
   INoAuthAddressObject,
   IPQAddressObject,
@@ -90,8 +84,38 @@ function assertPathIndex(name: string, value: number): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// secp256k1 addresses. The network selects the address type:
+//   "xna" / "xna-test":               ECDSA, Bech32m witness v3, m/84'/coin'
+//   "xna-legacy" / "xna-legacy-test": Legacy Base58, m/44'/1900' (testnet m/44'/1')
+//   "xna-old-legacy":                 Legacy Base58, m/44'/0' (mainnet only)
+// ---------------------------------------------------------------------------
+
+function ecdsaWitnessFields(publicKey: Uint8Array) {
+  const parts = ecdsaPublicKeyToCommitmentParts(publicKey);
+  return {
+    witnessVersion: 0x03 as const,
+    authType: 0x02 as const,
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
+    witnessScript: bytesToHex(parts.witnessScript),
+  };
+}
+
+function secp256k1AddressObject(chain: Secp256k1NetworkConfig, privateKey: Uint8Array, path: string): IAddressObject {
+  const publicKey = getCompressedPublicKey(privateKey);
+  return {
+    address: secp256k1PublicKeyToAddressBytes(publicKey, chain),
+    path,
+    publicKey: bytesToHex(publicKey),
+    privateKey: bytesToHex(privateKey),
+    WIF: encodeWIF(privateKey, chain.versions.private),
+    ...(chain.bech32 ? ecdsaWitnessFields(publicKey) : {}),
+  };
+}
+
 export function getCoinType(network: Network) {
-  return getNetwork(network).bip44;
+  return getNetwork(network).versions.bip44;
 }
 
 export function getAddressPair(
@@ -103,10 +127,11 @@ export function getAddressPair(
 ) {
   assertPathIndex("account", account);
   assertPathIndex("position", position);
+  const chain = getNetwork(network);
   const hdKey = getHDKey(network, mnemonic, passphrase);
-  const coinType = getCoinType(network);
-  const externalPath = `m/44'/${coinType}'/${account}'/0/${position}`;
-  const internalPath = `m/44'/${coinType}'/${account}'/1/${position}`;
+  const accountPath = `m/${chain.purpose}'/${chain.versions.bip44}'/${account}'`;
+  const externalPath = `${accountPath}/0/${position}`;
+  const internalPath = `${accountPath}/1/${position}`;
 
   return {
     internal: getAddressByPath(network, hdKey, internalPath),
@@ -118,7 +143,7 @@ export function getAddressPair(
 export function getHDKey(network: Network, mnemonic: string, passphrase = ""): HDKey {
   const chain = getNetwork(network);
   const seed = mnemonicToSeedBytes(mnemonicToSeedSync, mnemonic, passphrase);
-  return HDKey.fromMasterSeed(seed, chain.bip32);
+  return HDKey.fromMasterSeed(seed, chain.versions.bip32);
 }
 
 export function getAddressByPath(network: Network, hdKey: HDKey, path: string): IAddressObject {
@@ -127,7 +152,7 @@ export function getAddressByPath(network: Network, hdKey: HDKey, path: string): 
   if (!derived.privateKey) {
     throw new Error("Could not derive private key for path");
   }
-  return privateKeyToAddressObject(derived.privateKey, chain, path);
+  return secp256k1AddressObject(chain, derived.privateKey, path);
 }
 
 export function generateMnemonic() {
@@ -139,7 +164,22 @@ export function isMnemonicValid(mnemonic: string) {
 }
 
 export function getAddressByWIF(network: Network, privateKeyWIF: string) {
-  return addressObjectFromWIF(privateKeyWIF, getNetwork(network));
+  const chain = getNetwork(network);
+  if (!chain.bech32) {
+    return addressObjectFromWIF(privateKeyWIF, chain.versions);
+  }
+
+  const decoded = decodeWIF(privateKeyWIF);
+  if (!decoded.compressed) {
+    throw new Error("ECDSA (witness v3) addresses require a compressed WIF");
+  }
+  const publicKey = getCompressedPublicKey(decoded.privateKey);
+  return {
+    address: ecdsaPublicKeyToAddressBytes(publicKey, chain.bech32),
+    privateKey: bytesToHex(decoded.privateKey),
+    WIF: encodeWIF(decoded.privateKey, chain.versions.private),
+    ...ecdsaWitnessFields(publicKey),
+  };
 }
 
 export function getPubkeyByWIF(_network: Network, privateKeyWIF: string): string {
@@ -151,7 +191,8 @@ export function entropyToMnemonic(entropy: Uint8Array | string): string {
   return bip39EntropyToMnemonic(normalized, englishWordlist);
 }
 
-export function generateAddressObject(network: Network = "xna", passphrase = ""): IAddressObject {
+// Default stays Legacy: ECDSA witness v3 is not active on mainnet/testnet yet.
+export function generateAddressObject(network: Network = "xna-legacy", passphrase = ""): IAddressObject {
   const mnemonic = generateMnemonic();
   const addressObject = getAddressPair(network, mnemonic, 0, 0, passphrase).external;
   return {
@@ -163,14 +204,15 @@ export function generateAddressObject(network: Network = "xna", passphrase = "")
 
 export function publicKeyToAddress(network: Network, publicKey: Uint8Array | string): string {
   const keyBytes = normalizePublicKey(publicKey);
-  if (keyBytes.length !== 33 && keyBytes.length !== 65) {
+  const chain = getNetwork(network);
+  if (!chain.bech32 && keyBytes.length !== 33 && keyBytes.length !== 65) {
     throw new Error("Public key must be 33 or 65 bytes");
   }
   assertValidSecp256k1PublicKey(keyBytes);
-  return publicKeyToAddressBytes(keyBytes, getNetwork(network));
+  return secp256k1PublicKeyToAddressBytes(keyBytes, chain);
 }
 
-export function generateAddress(network: Network = "xna") {
+export function generateAddress(network: Network = "xna-legacy") {
   return generateAddressObject(network);
 }
 
@@ -289,80 +331,6 @@ export function generatePQAddressObject(
 }
 
 // ---------------------------------------------------------------------------
-// ECDSA addresses: strict AuthScript witness v3 (nq1r... / tnq1r...).
-// Compressed secp256k1 key from m/84'/coinType'/account'/change/index,
-// fixed OP_TRUE witnessScript.
-// ---------------------------------------------------------------------------
-
-function ecdsaAddressObject(chain: ECDSANetworkConfig, privateKey: Uint8Array): IECDSAAddressObject {
-  const publicKey = getCompressedPublicKey(privateKey);
-  const parts = ecdsaPublicKeyToCommitmentParts(publicKey);
-
-  return {
-    address: ecdsaPublicKeyToAddressBytes(publicKey, chain),
-    witnessVersion: 0x03,
-    authType: 0x02,
-    authDescriptor: bytesToHex(parts.authDescriptor),
-    commitment: bytesToHex(parts.commitment),
-    publicKey: bytesToHex(publicKey),
-    privateKey: bytesToHex(privateKey),
-    WIF: encodeWIF(privateKey, chain.private),
-    witnessScript: bytesToHex(parts.witnessScript),
-  };
-}
-
-export function getECDSAHDKey(network: ECDSANetwork, mnemonic: string, passphrase = ""): HDKey {
-  const seed = mnemonicToSeedBytes(mnemonicToSeedSync, mnemonic, passphrase);
-  return HDKey.fromMasterSeed(seed, getECDSANetwork(network).bip32);
-}
-
-export function getECDSAAddressByPath(network: ECDSANetwork, hdKey: HDKey, path: string): IECDSAAddressObject {
-  const derived = hdKey.derive(path);
-  if (!derived.privateKey) {
-    throw new Error("Could not derive private key for path");
-  }
-  return {
-    ...ecdsaAddressObject(getECDSANetwork(network), derived.privateKey),
-    path,
-  };
-}
-
-export function getECDSAAddress(
-  network: ECDSANetwork,
-  mnemonic: string,
-  account: number,
-  index: number,
-  passphrase = "",
-): IECDSAAddressObject {
-  assertPathIndex("account", account);
-  assertPathIndex("index", index);
-  const chain = getECDSANetwork(network);
-  const hdKey = getECDSAHDKey(network, mnemonic, passphrase);
-  const path = `m/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}/${index}`;
-  return getECDSAAddressByPath(network, hdKey, path);
-}
-
-export function getECDSAAddressByWIF(network: ECDSANetwork, wif: string): IECDSAAddressObject {
-  const decoded = decodeWIF(wif);
-  if (!decoded.compressed) {
-    throw new Error("ECDSA (witness v3) addresses require a compressed WIF");
-  }
-  return ecdsaAddressObject(getECDSANetwork(network), decoded.privateKey);
-}
-
-export function publicKeyToECDSAAddress(network: ECDSANetwork, publicKey: Uint8Array | string): string {
-  return ecdsaPublicKeyToAddressBytes(normalizePublicKey(publicKey), getECDSANetwork(network));
-}
-
-export function generateECDSAAddressObject(network: ECDSANetwork = "xna-ecdsa", passphrase = ""): IECDSAAddressObject {
-  const mnemonic = generateMnemonic();
-  return {
-    ...getECDSAAddress(network, mnemonic, 0, 0, passphrase),
-    mnemonic,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Generic AuthScript: witness v1 (nq1p... / tnq1p...). Any authType and any
 // witnessScript; used for contracts.
 // ---------------------------------------------------------------------------
@@ -437,7 +405,7 @@ export function getNoAuthAddress(network: AuthScriptNetwork, options: AuthScript
 
 export function getLegacyAuthScriptAddress(
   network: AuthScriptNetwork,
-  legacyNetwork: Network,
+  keyNetwork: Network,
   mnemonic: string,
   account: number,
   index: number,
@@ -446,27 +414,26 @@ export function getLegacyAuthScriptAddress(
 ): ILegacyAuthScriptAddressObject {
   assertPathIndex("account", account);
   assertPathIndex("index", index);
+  // The secp256k1 key is the one keyNetwork derives at this account/index.
   const chain = getAuthScriptNetwork(network);
-  const legacyChain = getNetwork(legacyNetwork);
-  const coinType = legacyChain.bip44;
-  const hdKey = getHDKey(legacyNetwork, mnemonic, passphrase);
-  const path = `m/44'/${coinType}'/${account}'/0/${index}`;
+  const keyChain = getNetwork(keyNetwork);
+  const hdKey = getHDKey(keyNetwork, mnemonic, passphrase);
+  const path = `m/${keyChain.purpose}'/${keyChain.versions.bip44}'/${account}'/0/${index}`;
   const derived = hdKey.derive(path);
 
   if (!derived.privateKey) {
     throw new Error("Could not derive private key for path");
   }
 
-  const legacyObject = privateKeyToAddressObject(derived.privateKey, legacyChain, path);
-  const publicKeyBytes = ensureBytes(legacyObject.publicKey);
+  const publicKeyBytes = getCompressedPublicKey(derived.privateKey);
   const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
 
   return {
     address: authScriptToAddressBytes(0x02, publicKeyBytes, chain, options),
     path,
-    publicKey: legacyObject.publicKey,
-    privateKey: legacyObject.privateKey,
-    WIF: legacyObject.WIF,
+    publicKey: bytesToHex(publicKeyBytes),
+    privateKey: bytesToHex(derived.privateKey),
+    WIF: encodeWIF(derived.privateKey, keyChain.versions.private),
     witnessVersion: 0x01,
     authType: 0x02,
     authDescriptor: bytesToHex(parts.authDescriptor),
@@ -520,12 +487,6 @@ const NeuraiKey = {
   pqPublicKeyToAuthDescriptorHex,
   pqPublicKeyToCommitmentHex,
   generatePQAddressObject,
-  getECDSAAddress,
-  getECDSAAddressByPath,
-  getECDSAAddressByWIF,
-  getECDSAHDKey,
-  publicKeyToECDSAAddress,
-  generateECDSAAddressObject,
   getPQAuthScriptAddress,
   getPQAuthScriptAddressByPath,
   pqPublicKeyToAuthScriptAddress,

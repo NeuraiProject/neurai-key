@@ -309,8 +309,11 @@
             <div class="network-selector">
                 <label for="network">Network:</label>
                 <select id="network">
-                    <option value="xna">Neurai Mainnet (XNA)</option>
-                    <option value="xna-test">Neurai Testnet (XNA-TEST)</option>
+                    <option value="xna-legacy">Neurai Mainnet - Legacy Base58 (xna-legacy)</option>
+                    <option value="xna-legacy-test">Neurai Testnet - Legacy Base58 (xna-legacy-test)</option>
+                    <option value="xna-old-legacy">Neurai Mainnet - Old Legacy, coin type 0 (xna-old-legacy)</option>
+                    <option value="xna">Neurai Mainnet - ECDSA witness v3 (xna)</option>
+                    <option value="xna-test">Neurai Testnet/Regtest - ECDSA witness v3 (xna-test)</option>
                 </select>
             </div>
 
@@ -429,10 +432,15 @@
                     mostrarMensaje(`Valid mnemonic (${palabras.length} words). Generating addresses on ${network}${passphraseMsg}...`, 'success');
 
                     let html = '';
+                    let accountPath = '';
 
                     // Generar las primeras 5 direcciones
                     for (let i = 0; i < 5; i++) {
                         const addressPair = NeuraiKey.getAddressPair(network, mnemonic, 0, i, passphrase); // Usar passphrase
+                        if (i === 0) {
+                            // m/purpose'/coin'/account' of the selected network
+                            accountPath = addressPair.external.path.split('/').slice(0, 4).join('/');
+                        }
 
                         // Dirección Externa (para recibir)
                         html += `
@@ -511,7 +519,7 @@
                         - The first 5 addresses (external and internal) have been generated<br>
                         - <strong>External</strong> addresses are used to receive payments<br>
                         - <strong>Internal</strong> addresses are used as change addresses<br>
-                        - Each pair follows the BIP44 standard with path m/44'/175'/0'/change/index<br>
+                        - Each pair follows the path ${accountPath}/change/index<br>
                         - Public keys can be converted back into addresses with <code>NeuraiKey.publicKeyToAddress</code>${passphraseInfo}
                     `;
                     resultsDiv.appendChild(infoDiv);

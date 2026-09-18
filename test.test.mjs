@@ -11,21 +11,21 @@ test("Random mnemonic should contain 12 words", () => {
 });
 
 test("Validate address on main-net", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
   expect(address.external.address).toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
 });
 
 test("Validate address on test-net", () => {
-  const network = "xna-test";
+  const network = "xna-legacy-test";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
   expect(address.external.address).toBe("tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9");
 });
 
 test("Validate address with passphrase on main-net", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const passphrase = "my secret passphrase";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, passphrase);
@@ -35,7 +35,7 @@ test("Validate address with passphrase on main-net", () => {
 });
 
 test("Different passphrases generate different addresses", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const passphrase1 = "passphrase1";
   const passphrase2 = "passphrase2";
@@ -47,7 +47,7 @@ test("Different passphrases generate different addresses", () => {
 });
 
 test("Empty passphrase equals no passphrase", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
 
   const addressWithEmpty = NeuraiKey.getAddressPair(network, mnemonic, 0, 1, "");
@@ -58,7 +58,7 @@ test("Empty passphrase equals no passphrase", () => {
 });
 
 test("Validate Wallet Import Format (WIF) main-net ", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
@@ -68,15 +68,15 @@ test("Validate Wallet Import Format (WIF) main-net ", () => {
 
 test("Convert external public key to main-net address", () => {
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-  const pair = NeuraiKey.getAddressPair("xna", mnemonic, 0, 1);
+  const pair = NeuraiKey.getAddressPair("xna-legacy", mnemonic, 0, 1);
 
-  expect(NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey)).toBe(
+  expect(NeuraiKey.publicKeyToAddress("xna-legacy", pair.external.publicKey)).toBe(
     pair.external.address
   );
 });
 
 test("Validate Wallet Import Format (WIF) test-net ", () => {
-  const network = "xna-test";
+  const network = "xna-legacy-test";
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
   const address = NeuraiKey.getAddressPair(network, mnemonic, 0, 1);
 
@@ -85,15 +85,15 @@ test("Validate Wallet Import Format (WIF) test-net ", () => {
 
 test("Convert external public key to test-net address", () => {
   const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-  const pair = NeuraiKey.getAddressPair("xna-test", mnemonic, 0, 1);
+  const pair = NeuraiKey.getAddressPair("xna-legacy-test", mnemonic, 0, 1);
 
-  expect(NeuraiKey.publicKeyToAddress("xna-test", pair.external.publicKey)).toBe(
+  expect(NeuraiKey.publicKeyToAddress("xna-legacy-test", pair.external.publicKey)).toBe(
     pair.external.address
   );
 });
 
 test("Validate get public address from Wallet Import Format (WIF) main-net ", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const WIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
   const addressObject = NeuraiKey.getAddressByWIF(network, WIF);
 
@@ -101,7 +101,7 @@ test("Validate get public address from Wallet Import Format (WIF) main-net ", ()
 });
 
 test("Get compressed public key from Wallet Import Format (WIF) main-net", () => {
-  const network = "xna";
+  const network = "xna-legacy";
   const WIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
   const publicKey = NeuraiKey.getPubkeyByWIF(network, WIF);
 
@@ -157,20 +157,27 @@ describe("generateAddress", () => {
 
     expect(result).toHaveProperty("mnemonic");
     expect(result.mnemonic).toBeDefined();
-    expect(result.network).toBe("xna");
     expect(result).toHaveProperty("address");
   });
 
-  it("default network should be xna for Neurai", () => {
-    const network = "xna-test";
-    const result = NeuraiKey.generateAddressObject(network);
-    expect(result.network).toBe(network);
+  it("default network is xna-legacy (Base58) while ECDSA witness v3 is not active on mainnet", () => {
+    const result = NeuraiKey.generateAddressObject();
+    expect(result.network).toBe("xna-legacy");
+    expect(result.address.startsWith("N")).toBe(true);
+    expect(NeuraiKey.generateAddress().address.startsWith("N")).toBe(true);
   });
 
-  it("Should handle xna-test", () => {
-    const network = "xna-test";
-    const result = NeuraiKey.generateAddressObject(network);
-    expect(result.network).toBe(network);
+  it("Should handle xna-legacy-test", () => {
+    const result = NeuraiKey.generateAddressObject("xna-legacy-test");
+    expect(result.network).toBe("xna-legacy-test");
+    expect(result.address.startsWith("t")).toBe(true);
+  });
+
+  it("Should handle xna (ECDSA witness v3)", () => {
+    const result = NeuraiKey.generateAddressObject("xna");
+    expect(result.network).toBe("xna");
+    expect(result.address.startsWith("nq1r")).toBe(true);
+    expect(result.mnemonic.split(" ").length).toBe(12);
   });
 });
 
@@ -424,7 +431,7 @@ describe("Legacy AuthScript (authType=0x02) addresses", () => {
   test("Legacy AuthScript from mnemonic with default witnessScript", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const result = NeuraiKey.getLegacyAuthScriptAddress(
-      "xna-authscript-test", "xna-test", mnemonic, 0, 0
+      "xna-authscript-test", "xna-legacy-test", mnemonic, 0, 0
     );
 
     expect(result.authType).toBe(2);
@@ -436,8 +443,8 @@ describe("Legacy AuthScript (authType=0x02) addresses", () => {
 
   test("Legacy AuthScript is deterministic", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-    const a = NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-test", mnemonic, 0, 0);
-    const b = NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-test", mnemonic, 0, 0);
+    const a = NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-legacy-test", mnemonic, 0, 0);
+    const b = NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-legacy-test", mnemonic, 0, 0);
     expect(a.address).toBe(b.address);
     expect(a.commitment).toBe(b.commitment);
     expect(a.WIF).toBe(b.WIF);
@@ -458,7 +465,7 @@ describe("Legacy AuthScript (authType=0x02) addresses", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const pq = NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", mnemonic, 0, 0);
     const legacy = NeuraiKey.getLegacyAuthScriptAddress(
-      "xna-authscript-test", "xna-test", mnemonic, 0, 0
+      "xna-authscript-test", "xna-legacy-test", mnemonic, 0, 0
     );
     expect(pq.address).not.toBe(legacy.address);
   });
@@ -508,7 +515,7 @@ describe("Node fixed vectors (scripts/data/authscript-vectors.json)", () => {
   test("ECDSA (witness v3) fixture key is not a secp256k1 point and is rejected", () => {
     // The node fixture only checks hashing/encoding with a synthetic key. Witness v3
     // is covered with real keys by the regtest node vectors below.
-    expect(() => NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa", FIXTURE_ECDSA_PUBKEY)).toThrow(/valid secp256k1 point/);
+    expect(() => NeuraiKey.publicKeyToAddress("xna", FIXTURE_ECDSA_PUBKEY)).toThrow(/valid secp256k1 point/);
   });
 
   test("Generic AuthScript (witness v1) addresses", () => {
@@ -572,9 +579,9 @@ describe("PQ addresses (strict AuthScript witness v2)", () => {
   });
 });
 
-describe("ECDSA addresses (strict AuthScript witness v3)", () => {
+describe("ECDSA addresses: xna / xna-test (strict AuthScript witness v3)", () => {
   test("Matches regtest node (getnewaddress ecdsa + dumpprivkey)", () => {
-    const addr = NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, 0);
+    const addr = NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0).external;
     expect(addr.address).toBe("tnq1r0c9zl485wv7wcfutxfyv8k2ltpfk5hdyp3s7g4chlphx8d2m6npqwxvjya");
     expect(addr.WIF).toBe("cTGhosGriPpuGA586jemcuH9pE9spwUmneMBmYYzrQEbY92DJrbo");
     expect(addr.path).toBe("m/84'/1'/0'/0/0");
@@ -587,56 +594,76 @@ describe("ECDSA addresses (strict AuthScript witness v3)", () => {
   });
 
   test("Change branch matches regtest node (getrawchangeaddress ecdsa)", () => {
-    const hdKey = NeuraiKey.getECDSAHDKey("xna-ecdsa-test", ABANDON);
-    const change = NeuraiKey.getECDSAAddressByPath("xna-ecdsa-test", hdKey, "m/84'/1'/0'/1/0");
-    expect(change.address).toBe("tnq1rlv89ggyeqgugm9tx0c6w9rumlxzdmuvt9yxjda9kkz64cmwzytsq9s6w6z");
-    expect(change.path).toBe("m/84'/1'/0'/1/0");
+    const pair = NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0);
+    expect(pair.internal.address).toBe("tnq1rlv89ggyeqgugm9tx0c6w9rumlxzdmuvt9yxjda9kkz64cmwzytsq9s6w6z");
+    expect(pair.internal.path).toBe("m/84'/1'/0'/1/0");
+    const hdKey = NeuraiKey.getHDKey("xna-test", ABANDON);
+    expect(NeuraiKey.getAddressByPath("xna-test", hdKey, "m/84'/1'/0'/1/0").address).toBe(pair.internal.address);
   });
 
   test("Passphrase matches regtest node (-mnemonicpassphrase)", () => {
-    const addr = NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, 0, "TREZOR");
+    const addr = NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0, "TREZOR").external;
     expect(addr.address).toBe("tnq1r8tn0zajpxr7zft5mee6krmygk6e8jy3qfefy5u0gvwejf2zlkussm9euy5");
   });
 
   test("Mainnet prefix nq1r, path m/84'/1900' and mainnet WIF", () => {
-    const addr = NeuraiKey.getECDSAAddress("xna-ecdsa", ABANDON, 0, 0);
+    const addr = NeuraiKey.getAddressPair("xna", ABANDON, 0, 0).external;
     expect(addr.address.startsWith("nq1r")).toBe(true);
     expect(addr.path).toBe("m/84'/1900'/0'/0/0");
     expect(addr.WIF.startsWith("K") || addr.WIF.startsWith("L")).toBe(true);
+    expect(NeuraiKey.getCoinType("xna")).toBe(1900);
   });
 
   test("From WIF and from public key reproduce the derived address", () => {
-    const derived = NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, 0);
-    const byWif = NeuraiKey.getECDSAAddressByWIF("xna-ecdsa-test", derived.WIF);
+    const derived = NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0).external;
+    const byWif = NeuraiKey.getAddressByWIF("xna-test", derived.WIF);
     expect(byWif.address).toBe(derived.address);
     expect(byWif.privateKey).toBe(derived.privateKey);
     expect(byWif.commitment).toBe(derived.commitment);
-    expect(NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa-test", derived.publicKey)).toBe(derived.address);
+    expect(NeuraiKey.publicKeyToAddress("xna-test", derived.publicKey)).toBe(derived.address);
   });
 
-  test("Uses its own m/84' key, not the BIP44 key of the Legacy AuthScript address", () => {
-    const ecdsa = NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, 0);
-    const legacy = NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-test", ABANDON, 0, 0);
+  test("Uses its own m/84' key, not the m/44' key of Legacy", () => {
+    const ecdsa = NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0).external;
+    const legacy = NeuraiKey.getAddressPair("xna-legacy-test", ABANDON, 0, 0).external;
     expect(ecdsa.publicKey).not.toBe(legacy.publicKey);
-    expect(legacy.address.startsWith("tnq1p")).toBe(true);
+    expect(legacy.path).toBe("m/44'/1'/0'/0/0");
+    expect(legacy.witnessVersion).toBeUndefined();
   });
 
   test("Rejects uncompressed public keys", () => {
-    expect(() => NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa-test", "04" + "11".repeat(64))).toThrow();
-    expect(() => NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa-test", "05" + "11".repeat(32))).toThrow();
+    expect(() => NeuraiKey.publicKeyToAddress("xna-test", "04" + "11".repeat(64))).toThrow();
+    expect(() => NeuraiKey.publicKeyToAddress("xna-test", "05" + "11".repeat(32))).toThrow();
   });
 
   test("Rejects uncompressed WIF", () => {
     // Private key of cTGhosGriPpuGA586jemcuH9pE9spwUmneMBmYYzrQEbY92DJrbo without the compression flag
     const uncompressedWif = "92sgc63gozHHpqjAmM5w4bxKJx6BcL974zrS6ZXMozNfBn4cx6m";
-    expect(NeuraiKey.getAddressByWIF("xna-test", uncompressedWif).address).toBeDefined();
-    expect(() => NeuraiKey.getECDSAAddressByWIF("xna-ecdsa-test", uncompressedWif)).toThrow(/compressed/);
+    expect(NeuraiKey.getAddressByWIF("xna-legacy-test", uncompressedWif).address).toBeDefined();
+    expect(() => NeuraiKey.getAddressByWIF("xna-test", uncompressedWif)).toThrow(/compressed/);
+  });
+});
+
+describe("Legacy networks: xna-legacy and xna-old-legacy", () => {
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+
+  test("xna-legacy gives the same Base58 address as 4.x \"xna\" (m/44'/1900')", () => {
+    const pair = NeuraiKey.getAddressPair("xna-legacy", mnemonic, 0, 1);
+    expect(pair.external.address).toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
+    expect(pair.external.path).toBe("m/44'/1900'/0'/0/1");
   });
 
-  test("generateECDSAAddressObject returns object with mnemonic", () => {
-    const result = NeuraiKey.generateECDSAAddressObject();
-    expect(result.address.startsWith("nq1r")).toBe(true);
-    expect(result.mnemonic.split(" ").length).toBe(12);
+  test("xna-old-legacy uses the historical coin type 0 (m/44'/0')", () => {
+    const pair = NeuraiKey.getAddressPair("xna-old-legacy", mnemonic, 0, 1);
+    expect(pair.external.path).toBe("m/44'/0'/0'/0/1");
+    expect(pair.external.address.startsWith("N")).toBe(true);
+    expect(pair.external.address).not.toBe("NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE");
+    expect(NeuraiKey.getCoinType("xna-old-legacy")).toBe(0);
+  });
+
+  test("xna-old-legacy has no testnet id (testnet coin type is 1, as in xna-legacy-test)", () => {
+    expect(() => NeuraiKey.getAddressPair("xna-old-legacy-test", mnemonic, 0, 0)).toThrow(/network must be/);
+    expect(NeuraiKey.getAddressPair("xna-legacy-test", mnemonic, 0, 0).external.path).toBe("m/44'/1'/0'/0/0");
   });
 });
 
@@ -644,7 +671,7 @@ describe("Network names are not interchangeable between address types", () => {
   test("AuthScript functions reject PQ networks and vice versa", () => {
     expect(() => NeuraiKey.getNoAuthAddress("xna-pq")).toThrow(/AuthScript network/);
     expect(() => NeuraiKey.getPQAddress("xna-authscript", ABANDON, 0, 0)).toThrow(/PQ network/);
-    expect(() => NeuraiKey.getECDSAAddress("xna-pq", ABANDON, 0, 0)).toThrow(/ECDSA network/);
+    expect(() => NeuraiKey.getAddressPair("xna-pq", ABANDON, 0, 0)).toThrow(/network must be/);
   });
 });
 
@@ -661,36 +688,36 @@ describe("Input validation", () => {
   });
 
   test("ECDSA and Base58 reject public keys that are not secp256k1 points", () => {
-    expect(() => NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa-test", "02" + "ff".repeat(32))).toThrow(/valid secp256k1 point/);
-    expect(() => NeuraiKey.publicKeyToAddress("xna", "02" + "ff".repeat(32))).toThrow(/valid secp256k1 point/);
-    expect(() => NeuraiKey.publicKeyToAddress("xna-test", FIXTURE_ECDSA_PUBKEY)).toThrow(/valid secp256k1 point/);
-    expect(() => NeuraiKey.publicKeyToAddress("xna", "04" + "11".repeat(64))).toThrow(/valid secp256k1 point/);
+    expect(() => NeuraiKey.publicKeyToAddress("xna-test", "02" + "ff".repeat(32))).toThrow(/valid secp256k1 point/);
+    expect(() => NeuraiKey.publicKeyToAddress("xna-legacy", "02" + "ff".repeat(32))).toThrow(/valid secp256k1 point/);
+    expect(() => NeuraiKey.publicKeyToAddress("xna-legacy-test", FIXTURE_ECDSA_PUBKEY)).toThrow(/valid secp256k1 point/);
+    expect(() => NeuraiKey.publicKeyToAddress("xna-legacy", "04" + "11".repeat(64))).toThrow(/valid secp256k1 point/);
   });
 
   test("Base58 still accepts valid compressed and uncompressed public keys", () => {
     // secp256k1 generator point G
     const gx = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
     const gy = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
-    expect(NeuraiKey.publicKeyToAddress("xna", "02" + gx).startsWith("N")).toBe(true);
-    expect(NeuraiKey.publicKeyToAddress("xna", "04" + gx + gy).startsWith("N")).toBe(true);
+    expect(NeuraiKey.publicKeyToAddress("xna-legacy", "02" + gx).startsWith("N")).toBe(true);
+    expect(NeuraiKey.publicKeyToAddress("xna-legacy", "04" + gx + gy).startsWith("N")).toBe(true);
   });
 
   test("Account and index must be integers in the BIP32 range", () => {
     for (const bad of [1.5, -1, 0x80000000, Number.NaN]) {
-      expect(() => NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, bad)).toThrow(/index must be an integer/);
-      expect(() => NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, bad, 0)).toThrow(/account must be an integer/);
+      expect(() => NeuraiKey.getAddressPair("xna-test", ABANDON, 0, bad)).toThrow(/position must be an integer/);
+      expect(() => NeuraiKey.getAddressPair("xna-test", ABANDON, bad, 0)).toThrow(/account must be an integer/);
       expect(() => NeuraiKey.getPQAddress("xna-pq-test", ABANDON, 0, bad)).toThrow(/index must be an integer/);
       expect(() => NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", ABANDON, 0, bad)).toThrow(/index must be an integer/);
-      expect(() => NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-test", ABANDON, 0, bad)).toThrow(/index must be an integer/);
-      expect(() => NeuraiKey.getAddressPair("xna-test", ABANDON, 0, bad)).toThrow(/position must be an integer/);
+      expect(() => NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-legacy-test", ABANDON, 0, bad)).toThrow(/index must be an integer/);
+      expect(() => NeuraiKey.getAddressPair("xna-legacy-test", ABANDON, 0, bad)).toThrow(/position must be an integer/);
     }
-    expect(NeuraiKey.getECDSAAddress("xna-ecdsa-test", ABANDON, 0, 0x7fffffff).path).toBe("m/84'/1'/0'/0/2147483647");
+    expect(NeuraiKey.getAddressPair("xna-test", ABANDON, 0, 0x7fffffff).external.path).toBe("m/84'/1'/0'/0/2147483647");
   });
 
   test("Derivation paths reject non-integer segments", () => {
-    const hdKey = NeuraiKey.getECDSAHDKey("xna-ecdsa-test", ABANDON);
-    expect(() => NeuraiKey.getECDSAAddressByPath("xna-ecdsa-test", hdKey, "m/84'/1'/0'/0/1.5")).toThrow(/Invalid index/);
-    expect(() => NeuraiKey.getECDSAAddressByPath("xna-ecdsa-test", hdKey, "m/84'/1'/0'/0/1x")).toThrow(/Invalid index/);
+    const hdKey = NeuraiKey.getHDKey("xna-test", ABANDON);
+    expect(() => NeuraiKey.getAddressByPath("xna-test", hdKey, "m/84'/1'/0'/0/1.5")).toThrow(/Invalid index/);
+    expect(() => NeuraiKey.getAddressByPath("xna-test", hdKey, "m/84'/1'/0'/0/1x")).toThrow(/Invalid index/);
     const pqHdKey = NeuraiKey.getPQHDKey("xna-pq-test", ABANDON);
     expect(() => NeuraiKey.getPQAddressByPath("xna-pq-test", pqHdKey, "m_pq/100'/1'/0'/0'/1.5'")).toThrow(/Invalid PQ-HD index/);
   });

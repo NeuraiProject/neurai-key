@@ -1,7 +1,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { bech32m } from "bech32";
 import { base58CheckDecode, base58CheckEncode, bytesToHex, concatBytes, ensureBytes, hash160, sha256Hash, taggedHash } from "./bytes.js";
-import type { AddressVersions, AuthScriptNetworkConfig, ECDSANetworkConfig, PQNetworkConfig } from "./networks.js";
+import type { AddressVersions, AuthScriptNetworkConfig, Bech32Params, PQNetworkConfig, Secp256k1NetworkConfig } from "./networks.js";
 import type { AuthScriptOptions, AuthType } from "../../types.js";
 
 const AUTHSCRIPT_TAG = "NeuraiAuthScript";
@@ -165,8 +165,16 @@ export function ecdsaPublicKeyToCommitmentParts(publicKey: Uint8Array) {
   return authScriptCommitmentParts(LEGACY_AUTH_TYPE, publicKey, {}, ECDSA_WITNESS_VERSION);
 }
 
-export function ecdsaPublicKeyToAddressBytes(publicKey: Uint8Array, network: ECDSANetworkConfig): string {
-  return bech32mEncode(network.hrp, network.witnessVersion, ecdsaPublicKeyToCommitmentParts(publicKey).commitment);
+export function ecdsaPublicKeyToAddressBytes(publicKey: Uint8Array, bech32: Bech32Params): string {
+  return bech32mEncode(bech32.hrp, bech32.witnessVersion, ecdsaPublicKeyToCommitmentParts(publicKey).commitment);
+}
+
+// Address of a secp256k1 public key: ECDSA witness v3 when the network has bech32
+// params ("xna" / "xna-test"), Legacy Base58 otherwise.
+export function secp256k1PublicKeyToAddressBytes(publicKey: Uint8Array, network: Secp256k1NetworkConfig): string {
+  return network.bech32
+    ? ecdsaPublicKeyToAddressBytes(publicKey, network.bech32)
+    : publicKeyToAddressBytes(publicKey, network.versions);
 }
 
 // A key off the curve would give an address nobody can spend from.

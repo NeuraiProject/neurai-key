@@ -14,10 +14,10 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Support for passphrase (25th word) for additional security
 - ✅ Multi-language mnemonic support (English, Spanish, French, Italian, etc.)
 - ✅ Mainnet and Testnet support for Neurai (XNA)
-- ✅ Support for both XNA (BIP44: 1900) and XNA Legacy (BIP44: 0) networks
+- ✅ Legacy Base58 addresses with coin type 1900 (`xna-legacy`) and the historical coin type 0 (`xna-old-legacy`)
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
 - ✅ PQ addresses (ML-DSA-44), Bech32m witness v2 (`pq1z…` / `tpq1z…`)
-- ✅ ECDSA addresses (secp256k1), Bech32m witness v3 (`nq1r…` / `tnq1r…`)
+- ✅ ECDSA addresses (secp256k1), Bech32m witness v3 (`nq1r…` / `tnq1r…`), network `xna`
 - ✅ Generic AuthScript witness v1 addresses for contracts (`nq1p…` / `tnq1p…`):
   - `authType = 0x00` NoAuth addresses from `witnessScript` only
   - `authType = 0x01` ML-DSA-44 key with a custom `witnessScript`
@@ -27,15 +27,23 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 ### 5.0.0: address types follow the node
 
-The Neurai node now has one address type per family (`getnewaddress "" legacy|pq|ecdsa`), plus the generic AuthScript witness v1 for contracts. The library networks follow the same split:
+The Neurai node now has one address type per family (`getnewaddress "" legacy|pq|ecdsa`), plus the generic AuthScript witness v1 for contracts. The library networks follow the same split, and **`xna` is now the ECDSA address**:
 
-| Network | Address | 4.x | 5.0.0 |
-|---------|---------|-----|-------|
-| `xna-pq` / `xna-pq-test` | PQ | generic witness v1 `nq1p…` / `tnq1p…` | **strict witness v2 `pq1z…` / `tpq1z…`** |
-| `xna-ecdsa` / `xna-ecdsa-test` | ECDSA | — | **new**: strict witness v3 `nq1r…` / `tnq1r…` |
-| `xna-authscript` / `xna-authscript-test` | Generic AuthScript | was `xna-pq` | **new name** for witness v1 `nq1p…` / `tnq1p…` |
+| Network | 4.x | 5.0.0 |
+|---------|-----|-------|
+| `xna` / `xna-test` | Legacy Base58, `m/44'/1900'` | **ECDSA witness v3 `nq1r…` / `tnq1r…`, `m/84'/1900'`** |
+| `xna-legacy` / `xna-legacy-test` | Legacy Base58, coin type 0 `m/44'/0'` (testnet `m/44'/1'`) | **Legacy Base58, `m/44'/1900'`** (testnet `m/44'/1'`, unchanged) |
+| `xna-old-legacy` | — | **new name** for Legacy Base58 with coin type 0 `m/44'/0'` (the 4.x `xna-legacy`) |
+| `xna-pq` / `xna-pq-test` | generic witness v1 `nq1p…` / `tnq1p…` | **PQ witness v2 `pq1z…` / `tpq1z…`** |
+| `xna-authscript` / `xna-authscript-test` | — (was `xna-pq`) | **new name** for generic witness v1 `nq1p…` / `tnq1p…` |
+
+⚠️ `xna`, `xna-legacy` and `xna-pq` keep their names but **return different addresses than 4.x for the same mnemonic, without any error**. When upgrading, rename `xna` → `xna-legacy`, `xna-legacy` → `xna-old-legacy` and `xna-pq` → `xna-authscript` (with the `*AuthScript*` PQ functions) to keep the 4.x addresses.
 
 Breaking changes versus `4.x`:
+- `getAddressPair`, `getAddressByPath`, `getAddressByWIF`, `publicKeyToAddress`, `getHDKey`, `getCoinType`, `generateAddress` and `generateAddressObject` select the address type from the network: `xna` / `xna-test` give ECDSA witness v3 addresses (with `witnessVersion`, `authType`, `authDescriptor`, `commitment` and `witnessScript`), the `*-legacy` networks give Base58. ECDSA rejects uncompressed keys and WIF.
+- `generateAddress()` and `generateAddressObject()` default to `xna-legacy`, so the default output is the same Base58 address as in 4.x.
+- `xna-old-legacy` has no testnet id: on testnet the coin type is 1 in both Legacy types, so `xna-legacy-test` gives the same path.
+- `getLegacyAuthScriptAddress(network, keyNetwork, …)` derives the secp256k1 key with the derivation of `keyNetwork`: use `xna-legacy` / `xna-legacy-test` for the 4.x `m/44'` key.
 - `getPQAddress`, `getPQAddressByPath`, `pqPublicKeyToAddress`, `pqPublicKeyToCommitmentHex` and `generatePQAddressObject` return the witness v2 PQ address. They no longer take AuthScript options (the template is fixed to `OP_TRUE`): passing the old `options` argument throws an error that points to the `*AuthScript*` function, so a contract `witnessScript` is never dropped silently.
 - The witness v1 PQ address moved to `getPQAuthScriptAddress`, `getPQAuthScriptAddressByPath`, `pqPublicKeyToAuthScriptAddress` and `pqPublicKeyToAuthScriptCommitmentHex`, with the `xna-authscript` networks. The same mnemonic and index give **the same `nq1p…` / `tnq1p…` address as 4.x**.
 - `getNoAuthAddress`, `getLegacyAuthScriptAddress` and `getLegacyAuthScriptAddressByWIF` take `xna-authscript` / `xna-authscript-test` instead of `xna-pq` / `xna-pq-test`.
@@ -47,11 +55,11 @@ The library already generates every format, but the node only protects an addres
 
 | Address type | Mainnet | Testnet | Regtest |
 |---|---|---|---|
-| Legacy (`xna`, `xna-legacy`) | ✅ | ✅ | ✅ |
+| Legacy (`xna-legacy`, `xna-old-legacy`) | ✅ | ✅ | ✅ |
 | Generic AuthScript witness v1 (`xna-authscript`) | ❌ not active: outputs are not protected | ✅ | ✅ |
-| PQ witness v2 (`xna-pq`), ECDSA witness v3 (`xna-ecdsa`) | ❌ the node rejects the address | ❌ the node rejects the address | ✅ |
+| PQ witness v2 (`xna-pq`), ECDSA witness v3 (`xna`) | ❌ the node rejects the address | ❌ the node rejects the address | ✅ |
 
-Until activation is announced: use **Legacy** on mainnet, Legacy or `xna-authscript-test` on testnet, and any type on regtest.
+Until activation is announced: use **Legacy** (`xna-legacy`) on mainnet, Legacy or `xna-authscript-test` on testnet, and any type on regtest.
 
 ### 4.0.0: native PQ HD tree
 
@@ -74,10 +82,10 @@ Each network selects one address type. The configuration lives in [`coins/`](coi
 
 | Network (mainnet / testnet) | Address type (`address-types.ts`) | Key and derivation (mainnet / testnet) | Encoding | Prefix |
 |---|---|---|---|---|
-| `xna` / `xna-test` | `legacy` (recommended Base58) | secp256k1, `m/44'/1900'/…` / `m/44'/1'/…` | Base58Check | `N…` / `t…` |
-| `xna-legacy` / `xna-legacy-test` | `legacyCoin0` (node wallet and older wallets) | secp256k1, `m/44'/0'/…` / `m/44'/1'/…` | Base58Check | `N…` / `t…` |
+| `xna` / `xna-test` | `ecdsa` | secp256k1, `m/84'/1900'/…` / `m/84'/1'/…` | Bech32m witness v3 | `nq1r…` / `tnq1r…` |
+| `xna-legacy` / `xna-legacy-test` | `legacy` | secp256k1, `m/44'/1900'/…` / `m/44'/1'/…` | Base58Check | `N…` / `t…` |
+| `xna-old-legacy` (mainnet only) | `oldLegacy`: coin type 0, used by the node wallet, exchanges and early wallets; not recommended for new wallets | secp256k1, `m/44'/0'/…` | Base58Check | `N…` |
 | `xna-pq` / `xna-pq-test` | `pq` | ML-DSA-44, `m_pq/100'/1900'/…` / `m_pq/100'/1'/…` (all hardened) | Bech32m witness v2 | `pq1z…` / `tpq1z…` |
-| `xna-ecdsa` / `xna-ecdsa-test` | `ecdsa` | secp256k1, `m/84'/1900'/…` / `m/84'/1'/…` | Bech32m witness v3 | `nq1r…` / `tnq1r…` |
 | `xna-authscript` / `xna-authscript-test` | `authscript` (contracts) | PQ tree for `0x01`, BIP44 for `0x02`, none for `0x00` | Bech32m witness v1 | `nq1p…` / `tnq1p…` |
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
@@ -97,7 +105,7 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 const mnemonic = NeuraiKey.generateMnemonic();
 const ACCOUNT = 0; //default is zero
 const POSITION = 1; //the second address for this wallet
-const network = "xna"; //or xna-test for testnet, xna-legacy for legacy addresses
+const network = "xna-legacy"; // or "xna-legacy-test"; "xna" / "xna-test" for ECDSA witness v3, "xna-old-legacy" for coin type 0
 const addressPair = NeuraiKey.getAddressPair(
   network,
   mnemonic,
@@ -116,18 +124,18 @@ Outputs
 Mnemonic result pact model attract result puzzle final boss private educate luggage era
 {
   internal: {
-    address: 'NQM5zP6jkwDgCZ2UQiUicW4e3YcWc4NY4S',
-    path: "m/44'/0'/0'/1/1",
-    publicKey: '02fe9a4190973398c54cdea353cb5b18aba4f272324ac3f15f4f204ef0884538e7',
-    privateKey: '8ce41bc45958cf3f4124bcd40b940752fbaf9be58ed8dec2dd7551388523f0a9',
-    WIF: 'L1was5cU14EbQDfz4BpiWhNAWZdmc4o1VSzv5w5GgKzSJwHpnGzP'
+    address: 'NRYT7zihLQTGpcK4PKHnTFuQsLaTGJYzqm',
+    path: "m/44'/1900'/0'/1/1",
+    publicKey: '02eb6df704791106986e27c40f4881fcef6623ba1a5c0ec05fba4d0ac72d008f90',
+    privateKey: 'fa18a46d7f3f0c4b7515d1127ef69c660dfcbcf53a1c960d9c9c6bb92bcdea91',
+    WIF: 'L5bs9DSrvyWXWVuvk9R4sTRAhUoNEB2rU4esFW2HV83pQiew62Ze'
   },
   external: {
-    address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
-    path: "m/44'/0'/0'/0/1",
-    publicKey: '024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0',
-    privateKey: '08ae5a08aa6a464619c177a551488c868010b4d2b2249892712be9a4990f9fc3',
-    WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
+    address: 'NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE',
+    path: "m/44'/1900'/0'/0/1",
+    publicKey: '0376523fef3027e4d3b5e1d90ac8dd90f0859a542156855eed32c87075baa94ed0',
+    privateKey: '7848ff5a02facd15865692e1e3742db6cc8ae8d466e9083a064efe60f6322f32',
+    WIF: 'L1FXfT3WjVLERgqiQt3YzqU9F3Z8LmMhxPF4VHW5yd3Q6Q66woRQ'
   },
   position: 1
 }
@@ -145,7 +153,7 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 
 const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
 const passphrase = "my secret passphrase"; // Optional but highly secure
-const network = "xna";
+const network = "xna-legacy";
 const ACCOUNT = 0;
 const POSITION = 0;
 
@@ -184,8 +192,8 @@ import NeuraiKey from "@neuraiproject/neurai-key";
 //use NeuraiKey.generateMnemonic() to generate mnemonic codes
 const mnemonic =
   "result pact model attract result puzzle final boss private educate luggage era";
-const path = "m/44'/175'/0'/0/1";
-const network = "xna"; //or xna-test for testnet
+const path = "m/44'/1900'/0'/0/1";
+const network = "xna-legacy"; // or "xna-legacy-test" for testnet (path m/44'/1'/...)
 
 // Optional: add passphrase as third parameter
 const passphrase = ""; // empty string or omit for no passphrase
@@ -201,11 +209,11 @@ Outputs
 
 ```
 {
-  address: 'NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp',
-  path: "m/44'/0'/0'/0/1",
-  publicKey: '024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0',
-  privateKey: '08ae5a08aa6a464619c177a551488c868010b4d2b2249892712be9a4990f9fc3',
-  WIF: 'KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq'
+  address: 'NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE',
+  path: "m/44'/1900'/0'/0/1",
+  publicKey: '0376523fef3027e4d3b5e1d90ac8dd90f0859a542156855eed32c87075baa94ed0',
+  privateKey: '7848ff5a02facd15865692e1e3742db6cc8ae8d466e9083a064efe60f6322f32',
+  WIF: 'L1FXfT3WjVLERgqiQt3YzqU9F3Z8LmMhxPF4VHW5yd3Q6Q66woRQ'
 }
 ```
 
@@ -217,20 +225,23 @@ Every derived address now exposes the compressed public key so you can verify or
 import NeuraiKey from "@neuraiproject/neurai-key";
 
 const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
-const pair = NeuraiKey.getAddressPair("xna", mnemonic, 0, 1);
+const pair = NeuraiKey.getAddressPair("xna-legacy", mnemonic, 0, 1);
 
 // `publicKey` is a hex string, but Buffers are also accepted
-const reconstructed = NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey);
+const reconstructed = NeuraiKey.publicKeyToAddress("xna-legacy", pair.external.publicKey);
 
-console.log(reconstructed); // NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp
+console.log(reconstructed); // NLhdtwjgrcEkRqjJZkRY4sjhkJ93EytLeE
 
 // Works the same way for testnet
-const testPair = NeuraiKey.getAddressPair("xna-test", mnemonic, 0, 1);
-const testAddress = NeuraiKey.publicKeyToAddress("xna-test", testPair.external.publicKey);
+const testPair = NeuraiKey.getAddressPair("xna-legacy-test", mnemonic, 0, 1);
+const testAddress = NeuraiKey.publicKeyToAddress("xna-legacy-test", testPair.external.publicKey);
 console.log(testAddress); // tPXGaMRNwZuV1UKSrD9gABPscrJWUmedQ9
+
+// The same key as an ECDSA witness v3 address
+NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey); // nq1r...
 ```
 
-`publicKeyToAddress` throws if the key length is not 33 or 65 bytes, or if the key is not a valid secp256k1 point (an address nobody could spend from), so invalid inputs are surfaced immediately.
+`publicKeyToAddress` throws if the key is not a valid secp256k1 point (an address nobody could spend from). Legacy networks accept 33 or 65-byte keys; `xna` / `xna-test` only accept 33-byte compressed keys.
 
 ## Bech32m address types
 
@@ -242,7 +253,7 @@ commitment = tagged_hash("NeuraiAuthScript", version || auth_descriptor || SHA25
 
 | | PQ | ECDSA | Generic AuthScript |
 |---|---|---|---|
-| Network | `xna-pq` / `xna-pq-test` | `xna-ecdsa` / `xna-ecdsa-test` | `xna-authscript` / `xna-authscript-test` |
+| Network | `xna-pq` / `xna-pq-test` | `xna` / `xna-test` | `xna-authscript` / `xna-authscript-test` |
 | Witness version / prefix | 2, `pq1z…` / `tpq1z…` | 3, `nq1r…` / `tnq1r…` | 1, `nq1p…` / `tnq1p…` |
 | `authType` | `0x01` (fixed) | `0x02` (fixed) | `0x00`, `0x01` or `0x02` |
 | Auth descriptor | `0x01 \|\| HASH160(0x05 \|\| pq_pubkey)` | `0x02 \|\| HASH160(compressed_pubkey)` | per `authType` |
@@ -353,43 +364,47 @@ The binary layout (74 bytes: `depth + fingerprint + child + chainCode + 0x00 + p
 
 ## ECDSA addresses (secp256k1, witness v3)
 
-secp256k1 keys in their own BIP32 branch `m/84'/coin'/account'/change/index`. The coin type is `1900` on mainnet (not the legacy `0`) and `1` on testnet/regtest.
+The `xna` / `xna-test` networks. They use the same functions as Legacy (`getAddressPair`, `getAddressByPath`, `getAddressByWIF`, `publicKeyToAddress`, `getHDKey`, `generateAddressObject`); the network selects the format. The key has its own BIP32 branch `m/84'/coin'/account'/change/index`, with coin type `1900` on mainnet (not the legacy `0`) and `1` on testnet/regtest.
 
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
 
-const ecdsa = NeuraiKey.getECDSAAddress("xna-ecdsa", mnemonic, 0, 0);
-console.log(ecdsa);
+const pair = NeuraiKey.getAddressPair("xna", mnemonic, 0, 0);
+console.log(pair.external);
 ```
 
 Outputs
 
 ```
 {
-  address: 'nq1r...',                   // Bech32m witness v3
-  witnessVersion: 3,
-  authType: 2,                          // 0x02 = secp256k1
-  authDescriptor: '02...',              // 0x02 || HASH160(compressed_pubkey)
-  commitment: '...',                    // tagged_hash("NeuraiAuthScript", 0x03 || ...)
+  address: 'nq1rp2ggnqzc6tuflpvl8y546y47k267q8044kzc5p4t63h6ygry0trqsdg6zs',
   path: "m/84'/1900'/0'/0/0",
-  publicKey: '02...',                   // compressed secp256k1 public key
-  privateKey: '...',
-  WIF: 'K...',
-  witnessScript: '51'                   // fixed OP_TRUE
+  publicKey: '023e304443f71149844e50cb5f2709429b438621cd8f78f6313b8265bc26ebbb45',
+  privateKey: '9f3abc386b6ded14c9d77854bbb58e3b990c09b8db3637d1b8ee48675134f0cf',
+  WIF: 'L2ZER28fendQ3gKjmdnZGGGni2ZBRvaxRaUsTHhxzXrpEuPBS3JY',
+  witnessVersion: 3,
+  authType: 2,                                         // 0x02 = secp256k1
+  authDescriptor: '02116fb1dfe13143d193c2a358c779e9556c8d3e6e', // 0x02 || HASH160(compressed_pubkey)
+  commitment: '0a90898058d2f89f859f39295d12beb2b5e01df5ad858a06abd46fa220647ac6',
+  witnessScript: '51'                                  // fixed OP_TRUE
 }
 ```
 
+(mnemonic `result pact model attract result puzzle final boss private educate luggage era`)
+
+`pair.internal` is the change branch (`m/84'/1900'/0'/1/0`), the same one the node uses for `getrawchangeaddress ecdsa`.
+
 ```javascript
-// Change (internal) branch or any other path, reusing the HD key
-const hdKey = NeuraiKey.getECDSAHDKey("xna-ecdsa", mnemonic);
-const change0 = NeuraiKey.getECDSAAddressByPath("xna-ecdsa", hdKey, "m/84'/1900'/0'/1/0");
+// Any path, reusing the HD key
+const hdKey = NeuraiKey.getHDKey("xna", mnemonic);
+const addr5 = NeuraiKey.getAddressByPath("xna", hdKey, "m/84'/1900'/0'/0/5");
 
 // From a WIF or a compressed public key
-NeuraiKey.getECDSAAddressByWIF("xna-ecdsa", ecdsa.WIF);
-NeuraiKey.publicKeyToECDSAAddress("xna-ecdsa", ecdsa.publicKey);
+NeuraiKey.getAddressByWIF("xna", pair.external.WIF);
+NeuraiKey.publicKeyToAddress("xna", pair.external.publicKey);
 
-// Random wallet
-const wallet = NeuraiKey.generateECDSAAddressObject("xna-ecdsa");
+// Random wallet (the default network of generateAddressObject is xna-legacy)
+const wallet = NeuraiKey.generateAddressObject("xna");
 ```
 
 Uncompressed keys (65-byte public keys or uncompressed WIF) are rejected, because the node has no ECDSA (witness v3) address for them. Public keys that are not valid secp256k1 points are rejected too: they would give an address nobody can spend from.
@@ -452,7 +467,7 @@ const noAuth = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
 
 ### Generate a Legacy AuthScript address from mnemonic
 
-This derives a normal secp256k1 key using the selected Base58 network (BIP44), then wraps it as a generic AuthScript address.
+This derives a secp256k1 key with the derivation of the given key network, then wraps it as a generic AuthScript address.
 
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
@@ -461,7 +476,7 @@ const mnemonic = "result pact model attract result puzzle final boss private edu
 
 const legacyAuth = NeuraiKey.getLegacyAuthScriptAddress(
   "xna-authscript-test",
-  "xna-test",
+  "xna-legacy-test",
   mnemonic,
   0,
   0
@@ -487,7 +502,7 @@ Outputs
 }
 ```
 
-For a plain secp256k1 receive address use the ECDSA type (`xna-ecdsa`) instead: it has its own derivation branch and fixed template.
+The second argument selects the secp256k1 key: its derivation path is the one of that network (`xna-legacy` / `xna-legacy-test`: `m/44'`). For a plain secp256k1 receive address use the ECDSA type (`xna`) instead: it has its own derivation branch and fixed template.
 
 ### Generate a Legacy AuthScript address from WIF
 
@@ -508,7 +523,7 @@ If you have a private key in Wallet Import Format (WIF) and want the correspondi
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
 
-const network = "xna"; // or "xna-test"
+const network = "xna-legacy"; // any secp256k1 network: the public key does not depend on it
 const wif = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
 
 const pubkeyHex = NeuraiKey.getPubkeyByWIF(network, wif);
@@ -596,9 +611,9 @@ Source: https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
 
 `m / purpose' / coin_type' / account' / change / address_index`
 
-So in the case of Neurai the path m/44'/0'/0'/0/1 says "give me the second address"
+So in the case of Neurai Legacy (`xna-legacy`) the path m/44'/1900'/0'/0/1 says "give me the second address"
 
-The first part m/44'/0' says that the purpose is to use BIP44 with Neurai (coin_type 0). Consider that static code.
+The first part m/44'/1900' says that the purpose is to use BIP44 with Neurai (SLIP-44 coin_type 1900). The historical coin type 0 (`xna-old-legacy`, m/44'/0') is kept only for old wallets. ECDSA addresses (`xna`) use the same structure with purpose 84 (m/84'/1900'), and PQ addresses use the native PQ tree m_pq/100'/1900' with every level hardened.
 
 Accounts is deprecated and should be 0
 

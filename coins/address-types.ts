@@ -12,7 +12,7 @@ type PerNetwork<T> = { mainnet: T; testnet: T };
 /**
  * Legacy: Base58Check P2PKH, secp256k1 key.
  * Path: m/44'/coinType'/account'/change/index
- * Library networks: "xna" / "xna-test"
+ * Library networks: "xna-legacy" / "xna-legacy-test"
  */
 const legacy = {
   encoding: "base58",
@@ -22,11 +22,13 @@ const legacy = {
 } as const;
 
 /**
- * Legacy with the historical coin type 0 (node wallet, exchanges, older wallets).
- * Path: m/44'/coinType'/account'/change/index
- * Library networks: "xna-legacy" / "xna-legacy-test"
+ * Old legacy: Legacy with the historical coin type 0, kept by the node wallet
+ * because exchanges and early wallets use it. Not recommended for new wallets.
+ * Path: m/44'/0'/account'/change/index
+ * Library network: "xna-old-legacy" (mainnet only: on testnet/regtest the coin
+ * type is 1, the same path as legacy, so "xna-legacy-test" covers it)
  */
-const legacyCoin0 = {
+const oldLegacy = {
   ...legacy,
   coinType: { mainnet: 0, testnet: 1 } as PerNetwork<number>,
 } as const;
@@ -55,7 +57,7 @@ const pq = {
  * Compressed secp256k1 key, fixed OP_TRUE witnessScript.
  * Auth descriptor: 0x02 || HASH160(compressed_pubkey)
  * Path: m/84'/coinType'/account'/change/index
- * Library networks: "xna-ecdsa" / "xna-ecdsa-test"
+ * Library networks: "xna" / "xna-test"
  */
 const ecdsa = {
   encoding: "bech32m",
@@ -84,4 +86,4 @@ const authscript = {
   defaultWitnessScript: "51",
 } as const;
 
-export const addressTypes = { legacy, legacyCoin0, pq, ecdsa, authscript };
+export const addressTypes = { legacy, oldLegacy, pq, ecdsa, authscript };

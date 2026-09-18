@@ -134,8 +134,8 @@ export class PQHDKey {
       if (!hardened) {
         throw new Error(`PQ-HD path requires hardened indices (got "${entry}")`);
       }
-      const raw = Number.parseInt(entry.slice(0, -1), 10);
-      if (!Number.isFinite(raw) || raw < 0 || raw >= HARDENED_OFFSET) {
+      const raw = /^\d+'$/.test(entry) ? Number(entry.slice(0, -1)) : Number.NaN;
+      if (!Number.isSafeInteger(raw) || raw >= HARDENED_OFFSET) {
         throw new Error(`Invalid PQ-HD index "${entry}"`);
       }
       current = current.deriveChild(raw + HARDENED_OFFSET);

@@ -16,14 +16,18 @@ import { wordlist as simplifiedChineseWordlist } from "@scure/bip39/wordlists/si
 import { bytesToHex, ensureBytes, mnemonicToSeedBytes } from "./bytes.js";
 import {
   addressObjectFromWIF,
+  assertValidSecp256k1PublicKey,
   authScriptCommitmentParts,
-  legacyAuthScriptToAddressBytes,
-  noAuthToAddressBytes,
+  authScriptToAddressBytes,
+  decodeWIF,
+  ecdsaPublicKeyToAddressBytes,
+  ecdsaPublicKeyToCommitmentParts,
+  encodeWIF,
+  getCompressedPublicKey,
   normalizePublicKey,
   normalizeWitnessScript,
   pqPublicKeyToAddressBytes,
   pqPublicKeyToAuthDescriptor,
-  pqPublicKeyToCommitment,
   pqPublicKeyToCommitmentParts,
   privateKeyToAddressObject,
   publicKeyHexFromWIF,
@@ -34,22 +38,33 @@ import { BIP32_PQ_EXTKEY_SIZE, PQHDKey } from "./pq-hdkey.js";
 
 export { BIP32_PQ_EXTKEY_SIZE, HDKey, PQHDKey };
 import {
+  getAuthScriptNetwork,
+  getECDSANetwork,
   getNetwork,
   getPQNetwork,
+  type AuthScriptNetwork,
+  type ECDSANetwork,
+  type ECDSANetworkConfig,
   type IAddressObject,
+  type IECDSAAddressObject,
   type ILegacyAuthScriptAddressObject,
   type INoAuthAddressObject,
   type IPQAddressObject,
+  type IPQAuthScriptAddressObject,
   type Network,
   type PQNetwork,
 } from "./networks.js";
 import type { AuthScriptOptions, PQAddressOptions } from "../../types.js";
 
 export type {
+  AuthScriptNetwork,
+  ECDSANetwork,
   IAddressObject,
+  IECDSAAddressObject,
   ILegacyAuthScriptAddressObject,
   INoAuthAddressObject,
   IPQAddressObject,
+  IPQAuthScriptAddressObject,
   Network,
   AuthScriptOptions,
   PQAddressOptions,
@@ -68,6 +83,13 @@ const mnemonicWordlists = [
   simplifiedChineseWordlist,
 ];
 
+// Account and index become BIP32 path segments: integers below the hardened offset.
+function assertPathIndex(name: string, value: number): void {
+  if (!Number.isInteger(value) || value < 0 || value >= 0x80000000) {
+    throw new Error(`${name} must be an integer between 0 and 2147483647 (got ${value})`);
+  }
+}
+
 export function getCoinType(network: Network) {
   return getNetwork(network).bip44;
 }
@@ -79,6 +101,8 @@ export function getAddressPair(
   position: number,
   passphrase = "",
 ) {
+  assertPathIndex("account", account);
+  assertPathIndex("position", position);
   const hdKey = getHDKey(network, mnemonic, passphrase);
   const coinType = getCoinType(network);
   const externalPath = `m/44'/${coinType}'/${account}'/0/${position}`;
@@ -142,11 +166,34 @@ export function publicKeyToAddress(network: Network, publicKey: Uint8Array | str
   if (keyBytes.length !== 33 && keyBytes.length !== 65) {
     throw new Error("Public key must be 33 or 65 bytes");
   }
+  assertValidSecp256k1PublicKey(keyBytes);
   return publicKeyToAddressBytes(keyBytes, getNetwork(network));
 }
 
 export function generateAddress(network: Network = "xna") {
   return generateAddressObject(network);
+}
+
+// ---------------------------------------------------------------------------
+// PQ addresses: strict AuthScript witness v2 (pq1z... / tpq1z...).
+// ML-DSA-44 key from the native PQ tree, fixed OP_TRUE witnessScript.
+// ---------------------------------------------------------------------------
+
+// 4.x PQ functions took AuthScript options. PQ (witness v2) has a fixed OP_TRUE
+// witnessScript, so reject them instead of silently dropping a contract script.
+function rejectRemovedPQOptions(fn: string, replacement: string, options: unknown): void {
+  if (options !== undefined) {
+    throw new Error(
+      `${fn}() no longer accepts AuthScript options: PQ addresses (witness v2) use a fixed OP_TRUE witnessScript. ` +
+        `Use ${replacement}() with an "xna-authscript" network for a custom witnessScript.`,
+    );
+  }
+}
+
+function assertPQPublicKey(keyBytes: Uint8Array): void {
+  if (keyBytes.length !== 1312) {
+    throw new Error("ML-DSA-44 public key must be 1312 bytes");
+  }
 }
 
 export function getPQHDKey(_network: PQNetwork, mnemonic: string, passphrase = ""): PQHDKey {
@@ -162,32 +209,226 @@ export function pqHDKeyFromExtended(network: PQNetwork, extKey: string): PQHDKey
   return PQHDKey.decodeBase58Check(extKey, getPQNetwork(network).pqExtPrivVersion);
 }
 
-export function getPQAddressByPath(network: PQNetwork, hdKey: PQHDKey, path: string, options: PQAddressOptions = {}): IPQAddressObject {
+export function getPQAddressByPath(
+  network: PQNetwork,
+  hdKey: PQHDKey,
+  path: string,
+  removedOptions?: never,
+): IPQAddressObject {
+  rejectRemovedPQOptions("getPQAddressByPath", "getPQAuthScriptAddressByPath", removedOptions);
   const chain = getPQNetwork(network);
   const derived = hdKey.derive(path);
   const publicKey = derived.publicKey;
-  const secretKey = derived.secretKey;
-  const authScript = pqPublicKeyToCommitmentParts(publicKey, options);
+  const parts = pqPublicKeyToCommitmentParts(publicKey);
 
   return {
-    address: pqPublicKeyToAddressBytes(publicKey, chain, options),
+    address: pqPublicKeyToAddressBytes(publicKey, chain),
+    witnessVersion: 0x02,
     authType: 0x01,
-    authDescriptor: bytesToHex(authScript.authDescriptor),
-    commitment: bytesToHex(authScript.commitment),
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
     path,
     publicKey: bytesToHex(publicKey),
-    privateKey: bytesToHex(secretKey),
+    privateKey: bytesToHex(derived.secretKey),
     seedKey: bytesToHex(derived.pqSeed),
-    witnessScript: bytesToHex(authScript.witnessScript),
+    witnessScript: bytesToHex(parts.witnessScript),
   };
 }
 
-export function getNoAuthAddress(network: PQNetwork, options: AuthScriptOptions = {}): INoAuthAddressObject {
+function pqDefaultPath(network: PQNetwork, account: number, index: number): string {
+  assertPathIndex("account", account);
+  assertPathIndex("index", index);
   const chain = getPQNetwork(network);
+  return `m_pq/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}'/${index}'`;
+}
+
+export function getPQAddress(
+  network: PQNetwork,
+  mnemonic: string,
+  account: number,
+  index: number,
+  passphrase = "",
+  removedOptions?: never,
+): IPQAddressObject {
+  rejectRemovedPQOptions("getPQAddress", "getPQAuthScriptAddress", removedOptions);
+  const hdKey = getPQHDKey(network, mnemonic, passphrase);
+  return getPQAddressByPath(network, hdKey, pqDefaultPath(network, account, index));
+}
+
+export function pqPublicKeyToAddress(network: PQNetwork, publicKey: Uint8Array | string, removedOptions?: never): string {
+  rejectRemovedPQOptions("pqPublicKeyToAddress", "pqPublicKeyToAuthScriptAddress", removedOptions);
+  const keyBytes = ensureBytes(publicKey);
+  assertPQPublicKey(keyBytes);
+  return pqPublicKeyToAddressBytes(keyBytes, getPQNetwork(network));
+}
+
+export function pqPublicKeyToCommitmentHex(publicKey: Uint8Array | string, removedOptions?: never): string {
+  rejectRemovedPQOptions("pqPublicKeyToCommitmentHex", "pqPublicKeyToAuthScriptCommitmentHex", removedOptions);
+  const keyBytes = ensureBytes(publicKey);
+  assertPQPublicKey(keyBytes);
+  return bytesToHex(pqPublicKeyToCommitmentParts(keyBytes).commitment);
+}
+
+export function pqPublicKeyToAuthDescriptorHex(publicKey: Uint8Array | string): string {
+  const keyBytes = ensureBytes(publicKey);
+  assertPQPublicKey(keyBytes);
+  return bytesToHex(pqPublicKeyToAuthDescriptor(keyBytes));
+}
+
+export function generatePQAddressObject(
+  network: PQNetwork = "xna-pq",
+  passphrase = "",
+  removedOptions?: never,
+): IPQAddressObject {
+  rejectRemovedPQOptions("generatePQAddressObject", "getPQAuthScriptAddress", removedOptions);
+  const mnemonic = generateMnemonic();
+  return {
+    ...getPQAddress(network, mnemonic, 0, 0, passphrase),
+    mnemonic,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ECDSA addresses: strict AuthScript witness v3 (nq1r... / tnq1r...).
+// Compressed secp256k1 key from m/84'/coinType'/account'/change/index,
+// fixed OP_TRUE witnessScript.
+// ---------------------------------------------------------------------------
+
+function ecdsaAddressObject(chain: ECDSANetworkConfig, privateKey: Uint8Array): IECDSAAddressObject {
+  const publicKey = getCompressedPublicKey(privateKey);
+  const parts = ecdsaPublicKeyToCommitmentParts(publicKey);
+
+  return {
+    address: ecdsaPublicKeyToAddressBytes(publicKey, chain),
+    witnessVersion: 0x03,
+    authType: 0x02,
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
+    publicKey: bytesToHex(publicKey),
+    privateKey: bytesToHex(privateKey),
+    WIF: encodeWIF(privateKey, chain.private),
+    witnessScript: bytesToHex(parts.witnessScript),
+  };
+}
+
+export function getECDSAHDKey(network: ECDSANetwork, mnemonic: string, passphrase = ""): HDKey {
+  const seed = mnemonicToSeedBytes(mnemonicToSeedSync, mnemonic, passphrase);
+  return HDKey.fromMasterSeed(seed, getECDSANetwork(network).bip32);
+}
+
+export function getECDSAAddressByPath(network: ECDSANetwork, hdKey: HDKey, path: string): IECDSAAddressObject {
+  const derived = hdKey.derive(path);
+  if (!derived.privateKey) {
+    throw new Error("Could not derive private key for path");
+  }
+  return {
+    ...ecdsaAddressObject(getECDSANetwork(network), derived.privateKey),
+    path,
+  };
+}
+
+export function getECDSAAddress(
+  network: ECDSANetwork,
+  mnemonic: string,
+  account: number,
+  index: number,
+  passphrase = "",
+): IECDSAAddressObject {
+  assertPathIndex("account", account);
+  assertPathIndex("index", index);
+  const chain = getECDSANetwork(network);
+  const hdKey = getECDSAHDKey(network, mnemonic, passphrase);
+  const path = `m/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}/${index}`;
+  return getECDSAAddressByPath(network, hdKey, path);
+}
+
+export function getECDSAAddressByWIF(network: ECDSANetwork, wif: string): IECDSAAddressObject {
+  const decoded = decodeWIF(wif);
+  if (!decoded.compressed) {
+    throw new Error("ECDSA (witness v3) addresses require a compressed WIF");
+  }
+  return ecdsaAddressObject(getECDSANetwork(network), decoded.privateKey);
+}
+
+export function publicKeyToECDSAAddress(network: ECDSANetwork, publicKey: Uint8Array | string): string {
+  return ecdsaPublicKeyToAddressBytes(normalizePublicKey(publicKey), getECDSANetwork(network));
+}
+
+export function generateECDSAAddressObject(network: ECDSANetwork = "xna-ecdsa", passphrase = ""): IECDSAAddressObject {
+  const mnemonic = generateMnemonic();
+  return {
+    ...getECDSAAddress(network, mnemonic, 0, 0, passphrase),
+    mnemonic,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Generic AuthScript: witness v1 (nq1p... / tnq1p...). Any authType and any
+// witnessScript; used for contracts.
+// ---------------------------------------------------------------------------
+
+export function getPQAuthScriptAddressByPath(
+  network: AuthScriptNetwork,
+  hdKey: PQHDKey,
+  path: string,
+  options: AuthScriptOptions = {},
+): IPQAuthScriptAddressObject {
+  const chain = getAuthScriptNetwork(network);
+  const derived = hdKey.derive(path);
+  const publicKey = derived.publicKey;
+  const parts = authScriptCommitmentParts(0x01, publicKey, options);
+
+  return {
+    address: authScriptToAddressBytes(0x01, publicKey, chain, options),
+    witnessVersion: 0x01,
+    authType: 0x01,
+    authDescriptor: bytesToHex(parts.authDescriptor),
+    commitment: bytesToHex(parts.commitment),
+    path,
+    publicKey: bytesToHex(publicKey),
+    privateKey: bytesToHex(derived.secretKey),
+    seedKey: bytesToHex(derived.pqSeed),
+    witnessScript: bytesToHex(parts.witnessScript),
+  };
+}
+
+export function getPQAuthScriptAddress(
+  network: AuthScriptNetwork,
+  mnemonic: string,
+  account: number,
+  index: number,
+  passphrase = "",
+  options: AuthScriptOptions = {},
+): IPQAuthScriptAddressObject {
+  const pqNetwork = getAuthScriptNetwork(network).pqNetwork;
+  const hdKey = getPQHDKey(pqNetwork, mnemonic, passphrase);
+  return getPQAuthScriptAddressByPath(network, hdKey, pqDefaultPath(pqNetwork, account, index), options);
+}
+
+export function pqPublicKeyToAuthScriptAddress(
+  network: AuthScriptNetwork,
+  publicKey: Uint8Array | string,
+  options: AuthScriptOptions = {},
+): string {
+  const keyBytes = ensureBytes(publicKey);
+  assertPQPublicKey(keyBytes);
+  normalizeWitnessScript(options.witnessScript);
+  return authScriptToAddressBytes(0x01, keyBytes, getAuthScriptNetwork(network), options);
+}
+
+export function pqPublicKeyToAuthScriptCommitmentHex(publicKey: Uint8Array | string, options: AuthScriptOptions = {}): string {
+  const keyBytes = ensureBytes(publicKey);
+  assertPQPublicKey(keyBytes);
+  return bytesToHex(authScriptCommitmentParts(0x01, keyBytes, options).commitment);
+}
+
+export function getNoAuthAddress(network: AuthScriptNetwork, options: AuthScriptOptions = {}): INoAuthAddressObject {
+  const chain = getAuthScriptNetwork(network);
   const parts = authScriptCommitmentParts(0x00, null, options);
 
   return {
-    address: noAuthToAddressBytes(chain, options),
+    address: authScriptToAddressBytes(0x00, null, chain, options),
+    witnessVersion: 0x01,
     authType: 0x00,
     commitment: bytesToHex(parts.commitment),
     witnessScript: bytesToHex(parts.witnessScript),
@@ -195,7 +436,7 @@ export function getNoAuthAddress(network: PQNetwork, options: AuthScriptOptions 
 }
 
 export function getLegacyAuthScriptAddress(
-  network: PQNetwork,
+  network: AuthScriptNetwork,
   legacyNetwork: Network,
   mnemonic: string,
   account: number,
@@ -203,7 +444,9 @@ export function getLegacyAuthScriptAddress(
   passphrase = "",
   options: AuthScriptOptions = {},
 ): ILegacyAuthScriptAddressObject {
-  const pqChain = getPQNetwork(network);
+  assertPathIndex("account", account);
+  assertPathIndex("index", index);
+  const chain = getAuthScriptNetwork(network);
   const legacyChain = getNetwork(legacyNetwork);
   const coinType = legacyChain.bip44;
   const hdKey = getHDKey(legacyNetwork, mnemonic, passphrase);
@@ -219,11 +462,12 @@ export function getLegacyAuthScriptAddress(
   const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
 
   return {
-    address: legacyAuthScriptToAddressBytes(publicKeyBytes, pqChain, options),
+    address: authScriptToAddressBytes(0x02, publicKeyBytes, chain, options),
     path,
     publicKey: legacyObject.publicKey,
     privateKey: legacyObject.privateKey,
     WIF: legacyObject.WIF,
+    witnessVersion: 0x01,
     authType: 0x02,
     authDescriptor: bytesToHex(parts.authDescriptor),
     commitment: bytesToHex(parts.commitment),
@@ -232,74 +476,25 @@ export function getLegacyAuthScriptAddress(
 }
 
 export function getLegacyAuthScriptAddressByWIF(
-  network: PQNetwork,
+  network: AuthScriptNetwork,
   wif: string,
   options: AuthScriptOptions = {},
 ): ILegacyAuthScriptAddressObject {
-  const pqChain = getPQNetwork(network);
+  const chain = getAuthScriptNetwork(network);
   const publicKeyHex = publicKeyHexFromWIF(wif);
   const publicKeyBytes = ensureBytes(publicKeyHex);
   const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
 
   return {
-    address: legacyAuthScriptToAddressBytes(publicKeyBytes, pqChain, options),
+    address: authScriptToAddressBytes(0x02, publicKeyBytes, chain, options),
     publicKey: publicKeyHex,
     privateKey: "",
     WIF: wif,
+    witnessVersion: 0x01,
     authType: 0x02,
     authDescriptor: bytesToHex(parts.authDescriptor),
     commitment: bytesToHex(parts.commitment),
     witnessScript: bytesToHex(parts.witnessScript),
-  };
-}
-
-export function getPQAddress(
-  network: PQNetwork,
-  mnemonic: string,
-  account: number,
-  index: number,
-  passphrase = "",
-  options: PQAddressOptions = {},
-): IPQAddressObject {
-  const chain = getPQNetwork(network);
-  const hdKey = getPQHDKey(network, mnemonic, passphrase);
-  const path = `m_pq/${chain.purpose}'/${chain.coinType}'/${account}'/${chain.changeIndex}'/${index}'`;
-  return getPQAddressByPath(network, hdKey, path, options);
-}
-
-export function pqPublicKeyToAddress(network: PQNetwork, publicKey: Uint8Array | string, options: PQAddressOptions = {}): string {
-  const keyBytes = ensureBytes(publicKey);
-  if (keyBytes.length !== 1312) {
-    throw new Error("ML-DSA-44 public key must be 1312 bytes");
-  }
-  normalizeWitnessScript(options.witnessScript);
-  return pqPublicKeyToAddressBytes(keyBytes, getPQNetwork(network), options);
-}
-
-export function pqPublicKeyToCommitmentHex(publicKey: Uint8Array | string, options: PQAddressOptions = {}): string {
-  const keyBytes = ensureBytes(publicKey);
-  if (keyBytes.length !== 1312) {
-    throw new Error("ML-DSA-44 public key must be 1312 bytes");
-  }
-
-  return bytesToHex(pqPublicKeyToCommitment(keyBytes, options));
-}
-
-export function pqPublicKeyToAuthDescriptorHex(publicKey: Uint8Array | string): string {
-  const keyBytes = ensureBytes(publicKey);
-  if (keyBytes.length !== 1312) {
-    throw new Error("ML-DSA-44 public key must be 1312 bytes");
-  }
-
-  return bytesToHex(pqPublicKeyToAuthDescriptor(keyBytes));
-}
-
-export function generatePQAddressObject(network: PQNetwork = "xna-pq", passphrase = "", options: PQAddressOptions = {}): IPQAddressObject {
-  const mnemonic = generateMnemonic();
-  const addressObj = getPQAddress(network, mnemonic, 0, 0, passphrase, options);
-  return {
-    ...addressObj,
-    mnemonic,
   };
 }
 
@@ -321,13 +516,23 @@ const NeuraiKey = {
   getPQHDKey,
   pqExtendedPrivateKey,
   pqHDKeyFromExtended,
-  getNoAuthAddress,
-  getLegacyAuthScriptAddress,
-  getLegacyAuthScriptAddressByWIF,
   pqPublicKeyToAddress,
   pqPublicKeyToAuthDescriptorHex,
   pqPublicKeyToCommitmentHex,
   generatePQAddressObject,
+  getECDSAAddress,
+  getECDSAAddressByPath,
+  getECDSAAddressByWIF,
+  getECDSAHDKey,
+  publicKeyToECDSAAddress,
+  generateECDSAAddressObject,
+  getPQAuthScriptAddress,
+  getPQAuthScriptAddressByPath,
+  pqPublicKeyToAuthScriptAddress,
+  pqPublicKeyToAuthScriptCommitmentHex,
+  getNoAuthAddress,
+  getLegacyAuthScriptAddress,
+  getLegacyAuthScriptAddressByWIF,
 };
 
 export default NeuraiKey;

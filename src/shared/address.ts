@@ -1,11 +1,14 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { bech32m } from "bech32";
 import { base58CheckDecode, base58CheckEncode, bytesToHex, concatBytes, ensureBytes, hash160, sha256Hash, taggedHash } from "./bytes.js";
-import type { AddressVersions, PQNetworkConfig } from "./networks.js";
-import type { AuthScriptOptions, AuthType, PQAddressOptions } from "../../types.js";
+import type { AddressVersions, AuthScriptNetworkConfig, ECDSANetworkConfig, PQNetworkConfig } from "./networks.js";
+import type { AuthScriptOptions, AuthType } from "../../types.js";
 
 const AUTHSCRIPT_TAG = "NeuraiAuthScript";
-const AUTHSCRIPT_VERSION = 0x01;
+// Witness versions double as the commitment preimage lead byte.
+const AUTHSCRIPT_VERSION = 0x01; // generic AuthScript
+const PQ_WITNESS_VERSION = 0x02; // strict PQ
+const ECDSA_WITNESS_VERSION = 0x03; // strict ECDSA
 const NOAUTH_TYPE = 0x00;
 const PQ_AUTH_TYPE = 0x01;
 const LEGACY_AUTH_TYPE = 0x02;
@@ -109,14 +112,11 @@ export function pqPublicKeyToAuthDescriptor(publicKey: Uint8Array): Uint8Array {
   return buildAuthDescriptor(PQ_AUTH_TYPE, publicKey);
 }
 
-export function pqPublicKeyToCommitment(publicKey: Uint8Array, options: PQAddressOptions = {}): Uint8Array {
-  return pqPublicKeyToCommitmentParts(publicKey, options).commitment;
-}
-
 export function authScriptCommitmentParts(
   authType: AuthType,
   publicKey: Uint8Array | null,
   options: AuthScriptOptions = {},
+  commitmentVersion: number = AUTHSCRIPT_VERSION,
 ) {
   const witnessScript = normalizeWitnessScript(options.witnessScript);
   const authDescriptor = buildAuthDescriptor(authType, publicKey);
@@ -124,7 +124,7 @@ export function authScriptCommitmentParts(
   const commitment = taggedHash(
     AUTHSCRIPT_TAG,
     concatBytes(
-      Uint8Array.from([AUTHSCRIPT_VERSION]),
+      Uint8Array.from([commitmentVersion]),
       authDescriptor,
       witnessScriptHash,
     ),
@@ -138,28 +138,52 @@ export function authScriptCommitmentParts(
   };
 }
 
-export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array, options: PQAddressOptions = {}) {
-  return authScriptCommitmentParts(PQ_AUTH_TYPE, publicKey, options);
-}
+// Generic AuthScript (witness v1): any authType, any witnessScript.
 
-export function pqPublicKeyToAddressBytes(publicKey: Uint8Array, network: PQNetworkConfig, options: PQAddressOptions = {}): string {
-  return bech32mEncode(network.hrp, network.witnessVersion, pqPublicKeyToCommitment(publicKey, options));
-}
-
-export function noAuthToAddressBytes(network: PQNetworkConfig, options: AuthScriptOptions = {}): string {
-  return bech32mEncode(network.hrp, network.witnessVersion, authScriptCommitmentParts(NOAUTH_TYPE, null, options).commitment);
-}
-
-export function legacyAuthScriptToAddressBytes(
-  publicKey: Uint8Array,
-  network: PQNetworkConfig,
+export function authScriptToAddressBytes(
+  authType: AuthType,
+  publicKey: Uint8Array | null,
+  network: AuthScriptNetworkConfig,
   options: AuthScriptOptions = {},
 ): string {
-  return bech32mEncode(
-    network.hrp,
-    network.witnessVersion,
-    authScriptCommitmentParts(LEGACY_AUTH_TYPE, publicKey, options).commitment,
-  );
+  return bech32mEncode(network.hrp, network.witnessVersion, authScriptCommitmentParts(authType, publicKey, options).commitment);
+}
+
+// PQ (strict witness v2) and ECDSA (strict witness v3): the witness version fixes
+// the authType and the witnessScript is always OP_TRUE.
+
+export function pqPublicKeyToCommitmentParts(publicKey: Uint8Array) {
+  return authScriptCommitmentParts(PQ_AUTH_TYPE, publicKey, {}, PQ_WITNESS_VERSION);
+}
+
+export function pqPublicKeyToAddressBytes(publicKey: Uint8Array, network: PQNetworkConfig): string {
+  return bech32mEncode(network.hrp, network.witnessVersion, pqPublicKeyToCommitmentParts(publicKey).commitment);
+}
+
+export function ecdsaPublicKeyToCommitmentParts(publicKey: Uint8Array) {
+  assertCompressedPublicKey(publicKey);
+  return authScriptCommitmentParts(LEGACY_AUTH_TYPE, publicKey, {}, ECDSA_WITNESS_VERSION);
+}
+
+export function ecdsaPublicKeyToAddressBytes(publicKey: Uint8Array, network: ECDSANetworkConfig): string {
+  return bech32mEncode(network.hrp, network.witnessVersion, ecdsaPublicKeyToCommitmentParts(publicKey).commitment);
+}
+
+// A key off the curve would give an address nobody can spend from.
+export function assertValidSecp256k1PublicKey(publicKey: Uint8Array): void {
+  try {
+    secp256k1.Point.fromBytes(publicKey).assertValidity();
+  } catch {
+    throw new Error("Public key is not a valid secp256k1 point");
+  }
+}
+
+// The node has no ECDSA (witness v3) destination for uncompressed keys.
+export function assertCompressedPublicKey(publicKey: Uint8Array): void {
+  if (publicKey.length !== 33 || (publicKey[0] !== 0x02 && publicKey[0] !== 0x03)) {
+    throw new Error("ECDSA (witness v3) addresses require a 33-byte compressed secp256k1 public key");
+  }
+  assertValidSecp256k1PublicKey(publicKey);
 }
 
 export function normalizePublicKey(input: Uint8Array | string): Uint8Array {

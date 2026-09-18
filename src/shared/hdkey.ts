@@ -85,11 +85,12 @@ export class HDKey {
         return;
       }
 
-      const hardened = entry.endsWith("'");
-      const childIndex = Number.parseInt(entry, 10);
-      if (!Number.isFinite(childIndex) || childIndex >= HARDENED_OFFSET) {
-        throw new Error("Invalid index");
+      const match = /^(\d+)(')?$/.exec(entry);
+      const childIndex = match ? Number(match[1]) : Number.NaN;
+      if (!Number.isSafeInteger(childIndex) || childIndex >= HARDENED_OFFSET) {
+        throw new Error(`Invalid index "${entry}"`);
       }
+      const hardened = match[2] === "'";
 
       current = current.deriveChild(hardened ? childIndex + HARDENED_OFFSET : childIndex);
     });

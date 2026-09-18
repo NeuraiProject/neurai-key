@@ -47,6 +47,8 @@ Breaking changes versus `4.x`:
 - `getPQAddress`, `getPQAddressByPath`, `pqPublicKeyToAddress`, `pqPublicKeyToCommitmentHex` and `generatePQAddressObject` return the witness v2 PQ address. They no longer take AuthScript options (the template is fixed to `OP_TRUE`): passing the old `options` argument throws an error that points to the `*AuthScript*` function, so a contract `witnessScript` is never dropped silently.
 - The witness v1 PQ address moved to `getPQAuthScriptAddress`, `getPQAuthScriptAddressByPath`, `pqPublicKeyToAuthScriptAddress` and `pqPublicKeyToAuthScriptCommitmentHex`, with the `xna-authscript` networks. The same mnemonic and index give **the same `nq1p…` / `tnq1p…` address as 4.x**.
 - `getNoAuthAddress`, `getLegacyAuthScriptAddress` and `getLegacyAuthScriptAddressByWIF` take `xna-authscript` / `xna-authscript-test` instead of `xna-pq` / `xna-pq-test`.
+- `getNoAuthAddress(network, { witnessScript })` requires the `witnessScript`. In 4.x it defaulted to `OP_TRUE`, which with NoAuth is an output anyone can spend. Pass `{ witnessScript: "51" }` explicitly to get the 4.x address.
+- An empty `witnessScript` (`""` or an empty byte array) now throws in every AuthScript function. In 4.x `""` was silently replaced by `OP_TRUE`.
 - PQ keys and extended keys (`xpqp…` / `tpqp…`) are unchanged: the witness v1 and witness v2 PQ addresses of an index share the same ML-DSA-44 key.
 
 ### Activation per network
@@ -257,7 +259,7 @@ commitment = tagged_hash("NeuraiAuthScript", version || auth_descriptor || SHA25
 | Witness version / prefix | 2, `pq1z…` / `tpq1z…` | 3, `nq1r…` / `tnq1r…` | 1, `nq1p…` / `tnq1p…` |
 | `authType` | `0x01` (fixed) | `0x02` (fixed) | `0x00`, `0x01` or `0x02` |
 | Auth descriptor | `0x01 \|\| HASH160(0x05 \|\| pq_pubkey)` | `0x02 \|\| HASH160(compressed_pubkey)` | per `authType` |
-| `witnessScript` | `OP_TRUE` (`51`), fixed | `OP_TRUE` (`51`), fixed | any, default `OP_TRUE` |
+| `witnessScript` | `OP_TRUE` (`51`), fixed | `OP_TRUE` (`51`), fixed | any; default `OP_TRUE` with a key (`0x01` / `0x02`), required for NoAuth (`0x00`) |
 | Use | receive PQ | receive ECDSA | contracts |
 
 PQ and ECDSA are only active on regtest, and generic AuthScript is not active on mainnet (see [activation per network](#activation-per-network)).
@@ -419,7 +421,12 @@ Witness v1 accepts any `authType` and any `witnessScript`, so it is the family u
 | `0x01` | PQ | ML-DSA-44 from the PQ tree (`m_pq/100'/coin'/…`) |
 | `0x02` | Legacy | secp256k1 from BIP44 (`m/44'/coin'/…`) |
 
-The commitment is `tagged_hash("NeuraiAuthScript", 0x01 || auth_descriptor || SHA256(witnessScript))`, with `OP_TRUE` (`51`) as default `witnessScript`.
+The commitment is `tagged_hash("NeuraiAuthScript", 0x01 || auth_descriptor || SHA256(witnessScript))`.
+
+`witnessScript` rules:
+- With a key (`0x01`, `0x02`), when it is not provided it defaults to `OP_TRUE` (`51`): the spend then only needs the signature.
+- For NoAuth (`0x00`) it is required, because there is no signature.
+- A provided script must not be empty: `""` or an empty byte array throws instead of becoming `OP_TRUE`. Malformed hex throws too.
 
 ### PQ key with a custom witnessScript
 
@@ -437,10 +444,14 @@ Without options it returns the same `nq1p…` / `tnq1p…` address that `getPQAd
 
 ### Generate a NoAuth address
 
+A NoAuth output has no key: nobody signs the spend, and anyone can build a transaction that spends it. The node accepts it only if the `witnessScript` ends true, so **the script alone decides who can spend the funds and how** (e.g. a covenant that checks the outputs with introspection opcodes). That is why `witnessScript` is required:
+
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
 
-const noAuth = NeuraiKey.getNoAuthAddress("xna-authscript-test");
+const noAuth = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
+  witnessScript: "527551" // hex or Uint8Array
+});
 
 console.log(noAuth);
 ```
@@ -453,17 +464,13 @@ Outputs
   witnessVersion: 1,
   authType: 0,
   commitment: "...",
-  witnessScript: "51"
+  witnessScript: "527551"
 }
 ```
 
-You can provide a custom `witnessScript`:
+Calling it without `witnessScript`, or with an empty one, throws.
 
-```javascript
-const noAuth = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
-  witnessScript: "527551"
-});
-```
+> ⚠️ The library only checks that a script is provided, not that it protects the funds. A wrong script, or one that is always true, gives an output that **anyone can spend**. For example, `{ witnessScript: "51" }` (`OP_TRUE`) is accepted when passed on purpose (tests, contracts meant to be spendable by anyone), but funds sent to that address are not under your exclusive control.
 
 ### Generate a Legacy AuthScript address from mnemonic
 

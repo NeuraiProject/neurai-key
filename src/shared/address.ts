@@ -84,8 +84,17 @@ export function bech32mEncode(hrp: string, witnessVersion: number, hash: Uint8Ar
   return bech32m.encode(hrp, [witnessVersion, ...bech32m.toWords(hash)]);
 }
 
-export function normalizeWitnessScript(input?: Uint8Array | string): Uint8Array {
-  return input ? ensureBytes(input) : Uint8Array.from(DEFAULT_WITNESS_SCRIPT);
+// Not provided (undefined / null): default OP_TRUE. A provided script must be
+// non-empty, so an empty value is never silently replaced by OP_TRUE.
+export function normalizeWitnessScript(input?: Uint8Array | string | null): Uint8Array {
+  if (input === undefined || input === null) {
+    return Uint8Array.from(DEFAULT_WITNESS_SCRIPT);
+  }
+  const script = ensureBytes(input);
+  if (script.length === 0) {
+    throw new Error("witnessScript must not be empty");
+  }
+  return script;
 }
 
 export function buildAuthDescriptor(authType: AuthType, publicKey: Uint8Array | null): Uint8Array {

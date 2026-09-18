@@ -50,7 +50,7 @@ import {
   type PQNetwork,
   type Secp256k1NetworkConfig,
 } from "./networks.js";
-import type { AuthScriptOptions, PQAddressOptions } from "../../types.js";
+import type { AuthScriptOptions, NoAuthOptions, PQAddressOptions } from "../../types.js";
 
 export type {
   AuthScriptNetwork,
@@ -61,6 +61,7 @@ export type {
   IPQAuthScriptAddressObject,
   Network,
   AuthScriptOptions,
+  NoAuthOptions,
   PQAddressOptions,
   PQNetwork,
 };
@@ -390,8 +391,16 @@ export function pqPublicKeyToAuthScriptCommitmentHex(publicKey: Uint8Array | str
   return bytesToHex(authScriptCommitmentParts(0x01, keyBytes, options).commitment);
 }
 
-export function getNoAuthAddress(network: AuthScriptNetwork, options: AuthScriptOptions = {}): INoAuthAddressObject {
+// NoAuth has no key, so the witnessScript alone decides who can spend: never
+// default it. The library only checks that a script is given, not that it is safe.
+export function getNoAuthAddress(network: AuthScriptNetwork, options: NoAuthOptions): INoAuthAddressObject {
   const chain = getAuthScriptNetwork(network);
+  if (options?.witnessScript === undefined || options?.witnessScript === null) {
+    throw new Error(
+      "getNoAuthAddress() requires an explicit witnessScript: a NoAuth address has no key, " +
+        "so the script alone defines who can spend it",
+    );
+  }
   const parts = authScriptCommitmentParts(0x00, null, options);
 
   return {

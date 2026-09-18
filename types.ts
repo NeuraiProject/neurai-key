@@ -31,6 +31,11 @@ export interface AuthScriptOptions {
 
 export type PQAddressOptions = AuthScriptOptions;
 
+/** NoAuth has no key: the witnessScript is required and alone defines who can spend. */
+export interface NoAuthOptions {
+  witnessScript: Uint8Array | string;
+}
+
 /** PQ address: strict AuthScript witness v2, ML-DSA-44 key, fixed OP_TRUE witnessScript. */
 export interface IPQAddressObject {
   address: string;

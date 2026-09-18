@@ -388,8 +388,11 @@ describe("PQ extended private key (xpqp/tpqp) serialization", () => {
 });
 
 describe("NoAuth (authType=0x00) addresses", () => {
-  test("NoAuth address with default witnessScript (OP_TRUE)", () => {
-    const result = NeuraiKey.getNoAuthAddress("xna-authscript-test");
+  // OP_TRUE is passed on purpose: with NoAuth it gives an output anyone can spend.
+  const OP_TRUE = { witnessScript: "51" };
+
+  test("NoAuth address with an explicit OP_TRUE witnessScript", () => {
+    const result = NeuraiKey.getNoAuthAddress("xna-authscript-test", OP_TRUE);
 
     expect(result.authType).toBe(0);
     expect(result.witnessScript).toBe("51");
@@ -398,32 +401,80 @@ describe("NoAuth (authType=0x00) addresses", () => {
   });
 
   test("NoAuth address is deterministic", () => {
-    const a = NeuraiKey.getNoAuthAddress("xna-authscript-test");
-    const b = NeuraiKey.getNoAuthAddress("xna-authscript-test");
+    const a = NeuraiKey.getNoAuthAddress("xna-authscript-test", { witnessScript: "527551" });
+    const b = NeuraiKey.getNoAuthAddress("xna-authscript-test", { witnessScript: "527551" });
     expect(a.address).toBe(b.address);
     expect(a.commitment).toBe(b.commitment);
   });
 
-  test("NoAuth with custom witnessScript produces different address", () => {
-    const defaultAddr = NeuraiKey.getNoAuthAddress("xna-authscript-test");
-    const customAddr = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
+  test("Different witnessScripts produce different addresses", () => {
+    const opTrue = NeuraiKey.getNoAuthAddress("xna-authscript-test", OP_TRUE);
+    const custom = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
       witnessScript: "527551",
     });
 
-    expect(defaultAddr.address).not.toBe(customAddr.address);
-    expect(customAddr.witnessScript).toBe("527551");
+    expect(opTrue.address).not.toBe(custom.address);
+    expect(custom.witnessScript).toBe("527551");
+  });
+
+  test("NoAuth accepts the witnessScript as bytes", () => {
+    const fromHex = NeuraiKey.getNoAuthAddress("xna-authscript-test", { witnessScript: "527551" });
+    const fromBytes = NeuraiKey.getNoAuthAddress("xna-authscript-test", {
+      witnessScript: Uint8Array.from([0x52, 0x75, 0x51]),
+    });
+    expect(fromBytes.address).toBe(fromHex.address);
   });
 
   test("NoAuth mainnet address starts with nq1", () => {
-    const result = NeuraiKey.getNoAuthAddress("xna-authscript");
+    const result = NeuraiKey.getNoAuthAddress("xna-authscript", OP_TRUE);
     expect(result.address.startsWith("nq1")).toBe(true);
   });
 
   test("NoAuth commitment matches neurai-sign-transaction test vector", () => {
-    const result = NeuraiKey.getNoAuthAddress("xna-authscript-test");
+    const result = NeuraiKey.getNoAuthAddress("xna-authscript-test", OP_TRUE);
     expect(result.commitment).toBe(
       "a6c181fcd8137e65528a30e4e2d457b51778238441b8f5dd8911c2084a17ee7b"
     );
+  });
+
+  test("NoAuth requires an explicit witnessScript", () => {
+    const net = "xna-authscript-test";
+    expect(() => NeuraiKey.getNoAuthAddress(net)).toThrow(/explicit witnessScript/);
+    expect(() => NeuraiKey.getNoAuthAddress(net, {})).toThrow(/explicit witnessScript/);
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: undefined })).toThrow(/explicit witnessScript/);
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: null })).toThrow(/explicit witnessScript/);
+    expect(() => NeuraiKey.getNoAuthAddress(net, null)).toThrow(/explicit witnessScript/);
+  });
+
+  test("NoAuth rejects an empty witnessScript", () => {
+    const net = "xna-authscript-test";
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: "" })).toThrow(/must not be empty/);
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: new Uint8Array(0) })).toThrow(/must not be empty/);
+  });
+
+  test("NoAuth rejects malformed hex", () => {
+    const net = "xna-authscript-test";
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: "515" })).toThrow();
+    expect(() => NeuraiKey.getNoAuthAddress(net, { witnessScript: "5g" })).toThrow();
+  });
+});
+
+describe("witnessScript: not provided vs empty", () => {
+  const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
+  const wif = "cVP9mzcDqMzWDhekiKMWKqEy739Cp6rKDT4tbG4wXXVfopMfTiBW";
+
+  test("Not provided still defaults to OP_TRUE for keyed AuthScript (a signature is required)", () => {
+    expect(NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", ABANDON, 0, 0).witnessScript).toBe("51");
+    expect(NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript-test", wif).witnessScript).toBe("51");
+    expect(NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript-test", wif, { witnessScript: undefined }).witnessScript).toBe("51");
+  });
+
+  test("An empty script is rejected instead of being replaced by OP_TRUE", () => {
+    const empty = { witnessScript: "" };
+    expect(() => NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", ABANDON, 0, 0, "", empty)).toThrow(/must not be empty/);
+    expect(() => NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript-test", wif, empty)).toThrow(/must not be empty/);
+    expect(() => NeuraiKey.getLegacyAuthScriptAddress("xna-authscript-test", "xna-legacy-test", mnemonic, 0, 0, "", empty)).toThrow(/must not be empty/);
+    expect(() => NeuraiKey.pqPublicKeyToAuthScriptAddress("xna-authscript-test", FIXTURE_PQ_PUBKEY, empty)).toThrow(/must not be empty/);
   });
 });
 
@@ -525,7 +576,7 @@ describe("Node fixed vectors (scripts/data/authscript-vectors.json)", () => {
     expect(NeuraiKey.pqPublicKeyToAuthScriptCommitmentHex(FIXTURE_PQ_PUBKEY)).toBe(
       "893d608e80620f81640872ac2455c5dc31e23a25bd44f035818e56e4f8021e6d"
     );
-    expect(NeuraiKey.getNoAuthAddress("xna-authscript-test").address).toBe(
+    expect(NeuraiKey.getNoAuthAddress("xna-authscript-test", { witnessScript: "51" }).address).toBe(
       "tnq1p5mqcrlxczdlx2552xrjw94zhk5thsguygxu0thvfz8pqsjshaeasklteyq"
     );
   });

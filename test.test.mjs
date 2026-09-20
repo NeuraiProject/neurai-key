@@ -773,3 +773,119 @@ describe("Input validation", () => {
     expect(() => NeuraiKey.getPQAddressByPath("xna-pq-test", pqHdKey, "m_pq/100'/1'/0'/0'/1.5'")).toThrow(/Invalid PQ-HD index/);
   });
 });
+
+// Address objects expose both the address and the commitment behind it. Both
+// come from a single commitment computation, so they must still agree with the
+// standalone helpers that compute it independently.
+describe("Address and commitment stay consistent", () => {
+  test("ECDSA (witness v3): by path, by WIF and from the public key agree", () => {
+    const hdKey = NeuraiKey.getHDKey("xna", ABANDON);
+    const byPath = NeuraiKey.getAddressByPath("xna", hdKey, "m/84'/1900'/0'/0/3");
+    const byWIF = NeuraiKey.getAddressByWIF("xna", byPath.WIF);
+
+    expect(byPath.address).toBe(NeuraiKey.publicKeyToAddress("xna", byPath.publicKey));
+    expect(byWIF.address).toBe(byPath.address);
+    expect(byWIF.commitment).toBe(byPath.commitment);
+    expect(byWIF.authDescriptor).toBe(byPath.authDescriptor);
+    expect(byWIF.witnessScript).toBe(byPath.witnessScript);
+  });
+
+  test("PQ (witness v2)", () => {
+    const pqAddress = NeuraiKey.getPQAddress("xna-pq", ABANDON, 0, 2);
+    expect(pqAddress.address).toBe(NeuraiKey.pqPublicKeyToAddress("xna-pq", pqAddress.publicKey));
+    expect(pqAddress.commitment).toBe(NeuraiKey.pqPublicKeyToCommitmentHex(pqAddress.publicKey));
+    expect(pqAddress.authDescriptor).toBe(NeuraiKey.pqPublicKeyToAuthDescriptorHex(pqAddress.publicKey));
+  });
+
+  test("Generic AuthScript (witness v1) with a custom witnessScript", () => {
+    const options = { witnessScript: "5187" };
+    const hdKey = NeuraiKey.getPQHDKey("xna-pq", ABANDON);
+    const addr = NeuraiKey.getPQAuthScriptAddressByPath("xna-authscript", hdKey, "m_pq/100'/1900'/0'/0'/0'", options);
+
+    expect(addr.address).toBe(NeuraiKey.pqPublicKeyToAuthScriptAddress("xna-authscript", addr.publicKey, options));
+    expect(addr.commitment).toBe(NeuraiKey.pqPublicKeyToAuthScriptCommitmentHex(addr.publicKey, options));
+    expect(addr.witnessScript).toBe("5187");
+  });
+
+  test("Legacy Base58 networks carry no witness fields", () => {
+    const addr = NeuraiKey.getAddressPair("xna-legacy", ABANDON, 0, 0).external;
+    expect(addr.address.startsWith("N")).toBe(true);
+    expect(addr.commitment).toBeUndefined();
+    expect(addr.witnessVersion).toBeUndefined();
+    expect(addr.witnessScript).toBeUndefined();
+  });
+});
+
+// BIP32 says to "proceed with the next value for i" when a child key comes out
+// invalid. The next value has to stay inside the same domain.
+describe("BIP32 child index bounds", () => {
+  const HARDENED = 0x80000000;
+
+  test("An out-of-range child index throws instead of wrapping", () => {
+    const hdKey = NeuraiKey.getHDKey("xna-legacy", ABANDON);
+    for (const bad of [2 ** 32, 2 ** 33, -1, 1.5, Number.NaN]) {
+      expect(() => hdKey.deriveChild(bad)).toThrow(/Invalid child index/);
+    }
+  });
+
+  test("The last normal index stays normal", () => {
+    const hdKey = NeuraiKey.getHDKey("xna-legacy", ABANDON);
+    // A public-only key cannot derive hardened children, so this would throw if
+    // index 2**31-1 fell through into the hardened range.
+    const publicOnly = new NeuraiKey.HDKey(hdKey.versions, hdKey.chainCode, hdKey.publicKey);
+    const child = publicOnly.deriveChild(HARDENED - 1);
+
+    expect(child.index).toBe(HARDENED - 1);
+    expect(child.privateKey).toBeUndefined();
+    expect(child.publicKey).toEqual(hdKey.deriveChild(HARDENED - 1).publicKey);
+  });
+
+  test("The last hardened index does not wrap back to index 0", () => {
+    const hdKey = NeuraiKey.getHDKey("xna-legacy", ABANDON);
+    const last = hdKey.deriveChild(2 ** 32 - 1);
+
+    expect(last.index).toBe(2 ** 32 - 1);
+    expect(last.publicKey).not.toEqual(hdKey.deriveChild(HARDENED).publicKey);
+  });
+});
+
+// The node's CNeuraiSecret::IsValid() requires the WIF prefix to match the active chain,
+// so a foreign WIF must not be silently re-encoded for the target network.
+describe("WIF is bound to its network", () => {
+  // Public test fixtures: mainnet WIF version 0x80, testnet 0xef.
+  const mainnetWIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
+  const testnetWIF = NeuraiKey.getAddressPair("xna-legacy-test", ABANDON, 0, 0).external.WIF;
+  const wrongNetwork = /different network/;
+
+  test("getAddressByWIF rejects a WIF from the other network", () => {
+    expect(() => NeuraiKey.getAddressByWIF("xna-legacy-test", mainnetWIF)).toThrow(wrongNetwork);
+    expect(() => NeuraiKey.getAddressByWIF("xna-test", mainnetWIF)).toThrow(wrongNetwork);
+    expect(() => NeuraiKey.getAddressByWIF("xna-legacy", testnetWIF)).toThrow(wrongNetwork);
+    expect(() => NeuraiKey.getAddressByWIF("xna", testnetWIF)).toThrow(wrongNetwork);
+  });
+
+  test("getPubkeyByWIF honours its network argument", () => {
+    expect(() => NeuraiKey.getPubkeyByWIF("xna-legacy-test", mainnetWIF)).toThrow(wrongNetwork);
+    expect(NeuraiKey.getPubkeyByWIF("xna-legacy", mainnetWIF)).toBe(
+      "024108b96e53795cc28fb8b64532e61f17aa3c149e06815958361c5dddba1e7ec0"
+    );
+  });
+
+  test("getLegacyAuthScriptAddressByWIF rejects a WIF from the other chain", () => {
+    expect(() => NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript-test", mainnetWIF)).toThrow(wrongNetwork);
+    expect(() => NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript", testnetWIF)).toThrow(wrongNetwork);
+  });
+
+  test("A matching WIF still works on every network that takes one", () => {
+    expect(NeuraiKey.getAddressByWIF("xna-legacy", mainnetWIF).address).toBe("NLdcSXGQvCVf2RTKhx7GZom34f1JADhBTp");
+    expect(NeuraiKey.getAddressByWIF("xna-legacy-test", testnetWIF).address.startsWith("t")).toBe(true);
+    expect(NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript", mainnetWIF).address.startsWith("nc1")).toBe(true);
+  });
+
+  test("The network check fires before the compressed-WIF check", () => {
+    // Testnet uncompressed WIF: wrong network for xna, and also uncompressed.
+    const uncompressedTestnetWIF = "92sgc63gozHHpqjAmM5w4bxKJx6BcL974zrS6ZXMozNfBn4cx6m";
+    expect(() => NeuraiKey.getAddressByWIF("xna", uncompressedTestnetWIF)).toThrow(wrongNetwork);
+    expect(() => NeuraiKey.getAddressByWIF("xna-test", uncompressedTestnetWIF)).toThrow(/compressed/);
+  });
+});

@@ -19,8 +19,8 @@ import {
   assertValidSecp256k1PublicKey,
   authScriptCommitmentParts,
   authScriptToAddressBytes,
+  commitmentToAddressBytes,
   decodeWIF,
-  ecdsaPublicKeyToAddressBytes,
   ecdsaPublicKeyToCommitmentParts,
   secp256k1PublicKeyToAddressBytes,
   encodeWIF,
@@ -31,6 +31,7 @@ import {
   pqPublicKeyToAuthDescriptor,
   pqPublicKeyToCommitmentParts,
   publicKeyHexFromWIF,
+  publicKeyToAddressBytes,
 } from "./address.js";
 import { HDKey } from "./hdkey.js";
 import { BIP32_PQ_EXTKEY_SIZE, PQHDKey } from "./pq-hdkey.js";
@@ -41,6 +42,7 @@ import {
   getNetwork,
   getPQNetwork,
   type AuthScriptNetwork,
+  type Bech32Params,
   type IAddressObject,
   type ILegacyAuthScriptAddressObject,
   type INoAuthAddressObject,
@@ -92,9 +94,12 @@ function assertPathIndex(name: string, value: number): void {
 //   "xna-old-legacy":                 Legacy Base58, m/44'/0' (mainnet only)
 // ---------------------------------------------------------------------------
 
-function ecdsaWitnessFields(publicKey: Uint8Array) {
+// The address and the witness fields come from the same commitment, so it is
+// computed once here rather than again inside ecdsaPublicKeyToAddressBytes().
+function ecdsaAddressFields(publicKey: Uint8Array, bech32: Bech32Params) {
   const parts = ecdsaPublicKeyToCommitmentParts(publicKey);
   return {
+    address: commitmentToAddressBytes(parts.commitment, bech32),
     witnessVersion: 0x03 as const,
     authType: 0x02 as const,
     authDescriptor: bytesToHex(parts.authDescriptor),
@@ -106,12 +111,13 @@ function ecdsaWitnessFields(publicKey: Uint8Array) {
 function secp256k1AddressObject(chain: Secp256k1NetworkConfig, privateKey: Uint8Array, path: string): IAddressObject {
   const publicKey = getCompressedPublicKey(privateKey);
   return {
-    address: secp256k1PublicKeyToAddressBytes(publicKey, chain),
+    ...(chain.bech32
+      ? ecdsaAddressFields(publicKey, chain.bech32)
+      : { address: publicKeyToAddressBytes(publicKey, chain.versions) }),
     path,
     publicKey: bytesToHex(publicKey),
     privateKey: bytesToHex(privateKey),
     WIF: encodeWIF(privateKey, chain.versions.private),
-    ...(chain.bech32 ? ecdsaWitnessFields(publicKey) : {}),
   };
 }
 
@@ -170,21 +176,20 @@ export function getAddressByWIF(network: Network, privateKeyWIF: string) {
     return addressObjectFromWIF(privateKeyWIF, chain.versions);
   }
 
-  const decoded = decodeWIF(privateKeyWIF);
+  const decoded = decodeWIF(privateKeyWIF, chain.versions.private);
   if (!decoded.compressed) {
     throw new Error("ECDSA (witness v3) addresses require a compressed WIF");
   }
   const publicKey = getCompressedPublicKey(decoded.privateKey);
   return {
-    address: ecdsaPublicKeyToAddressBytes(publicKey, chain.bech32),
+    ...ecdsaAddressFields(publicKey, chain.bech32),
     privateKey: bytesToHex(decoded.privateKey),
     WIF: encodeWIF(decoded.privateKey, chain.versions.private),
-    ...ecdsaWitnessFields(publicKey),
   };
 }
 
-export function getPubkeyByWIF(_network: Network, privateKeyWIF: string): string {
-  return publicKeyHexFromWIF(privateKeyWIF);
+export function getPubkeyByWIF(network: Network, privateKeyWIF: string): string {
+  return publicKeyHexFromWIF(privateKeyWIF, getNetwork(network).versions.private);
 }
 
 export function entropyToMnemonic(entropy: Uint8Array | string): string {
@@ -265,7 +270,7 @@ export function getPQAddressByPath(
   const parts = pqPublicKeyToCommitmentParts(publicKey);
 
   return {
-    address: pqPublicKeyToAddressBytes(publicKey, chain),
+    address: commitmentToAddressBytes(parts.commitment, chain),
     witnessVersion: 0x02,
     authType: 0x01,
     authDescriptor: bytesToHex(parts.authDescriptor),
@@ -348,7 +353,7 @@ export function getPQAuthScriptAddressByPath(
   const parts = authScriptCommitmentParts(0x01, publicKey, options);
 
   return {
-    address: authScriptToAddressBytes(0x01, publicKey, chain, options),
+    address: commitmentToAddressBytes(parts.commitment, chain),
     witnessVersion: 0x01,
     authType: 0x01,
     authDescriptor: bytesToHex(parts.authDescriptor),
@@ -404,7 +409,7 @@ export function getNoAuthAddress(network: AuthScriptNetwork, options: NoAuthOpti
   const parts = authScriptCommitmentParts(0x00, null, options);
 
   return {
-    address: authScriptToAddressBytes(0x00, null, chain, options),
+    address: commitmentToAddressBytes(parts.commitment, chain),
     witnessVersion: 0x01,
     authType: 0x00,
     commitment: bytesToHex(parts.commitment),
@@ -438,7 +443,7 @@ export function getLegacyAuthScriptAddress(
   const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
 
   return {
-    address: authScriptToAddressBytes(0x02, publicKeyBytes, chain, options),
+    address: commitmentToAddressBytes(parts.commitment, chain),
     path,
     publicKey: bytesToHex(publicKeyBytes),
     privateKey: bytesToHex(derived.privateKey),
@@ -457,12 +462,12 @@ export function getLegacyAuthScriptAddressByWIF(
   options: AuthScriptOptions = {},
 ): ILegacyAuthScriptAddressObject {
   const chain = getAuthScriptNetwork(network);
-  const publicKeyHex = publicKeyHexFromWIF(wif);
+  const publicKeyHex = publicKeyHexFromWIF(wif, chain.wifVersion);
   const publicKeyBytes = ensureBytes(publicKeyHex);
   const parts = authScriptCommitmentParts(0x02, publicKeyBytes, options);
 
   return {
-    address: authScriptToAddressBytes(0x02, publicKeyBytes, chain, options),
+    address: commitmentToAddressBytes(parts.commitment, chain),
     publicKey: publicKeyHex,
     privateKey: "",
     WIF: wif,

@@ -47,6 +47,7 @@ export interface PQNetworkConfig extends Bech32Params {
 // Generic AuthScript (witness v1): any authType and witnessScript, for contracts.
 export interface AuthScriptNetworkConfig extends Bech32Params {
   pqNetwork: PQNetwork; // authType 0x01 keys derive from this PQ tree
+  wifVersion: number; // authType 0x02 keys must come from a WIF of this chain
 }
 
 // Library network ids -> address type (coins/address-types.ts) + chain (coins/chain-params.ts).
@@ -92,6 +93,7 @@ function authScriptConfig(chain: Chain, pqNetwork: PQNetwork): AuthScriptNetwork
     hrp: authscript.hrp[chain],
     witnessVersion: authscript.witnessVersion,
     pqNetwork,
+    wifVersion: chainParams[chain].base58.wif,
   };
 }
 

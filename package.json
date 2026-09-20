@@ -26,7 +26,8 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && rollup -c",
-    "test": "npm run build && vitest run ./test.test.mjs"
+    "test": "npm run build && vitest run ./test.test.mjs ./hdkey.test.mjs",
+    "bench": "npm run build && node ./bench.mjs"
   },
   "repository": {
     "type": "git",

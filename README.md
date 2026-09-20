@@ -56,6 +56,7 @@ Breaking changes versus `4.x`:
 - `getNoAuthAddress(network, { witnessScript })` requires the `witnessScript`. In 4.x it defaulted to `OP_TRUE`, which with NoAuth is an output anyone can spend. Pass `{ witnessScript: "51" }` explicitly to get the 4.x address.
 - An empty `witnessScript` (`""` or an empty byte array) now throws in every AuthScript function. In 4.x `""` was silently replaced by `OP_TRUE`.
 - PQ keys and extended keys (`xpqp…` / `tpqp…`) are unchanged: the witness v1 and witness v2 PQ addresses of an index share the same ML-DSA-44 key.
+- `getAddressByWIF`, `getPubkeyByWIF` and `getLegacyAuthScriptAddressByWIF` reject a WIF whose version byte does not match the network passed in. Previously, the network prefix was not checked; `getAddressByWIF` could silently re-encode the WIF for the target network, and `getPubkeyByWIF` ignored its `network` argument entirely. The new check prevents accidental cross-network conversion. See [WIF network validation](#wif-network-validation).
 
 ### Activation per network
 
@@ -105,7 +106,7 @@ Each network selects one address type. The configuration lives in [`coins/`](coi
 
 A simple and "spot on" way to generate/derive addresses.
 
-If you need brutal performance check out getAddressByPath example below.
+If you are deriving more than a couple of addresses, use `getHDKey` + `getAddressByPath` instead — see [Deriving many addresses](#deriving-many-addresses) below.
 
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
@@ -224,6 +225,35 @@ Outputs
   WIF: 'L1FXfT3WjVLERgqiQt3YzqU9F3Z8LmMhxPF4VHW5yd3Q6Q66woRQ'
 }
 ```
+
+## Deriving many addresses
+
+`getAddressPair`, `getPQAddress` and the other mnemonic-taking functions rebuild the BIP39 seed on every call using PBKDF2 with 2048 rounds. For repeated derivations, derive the HD key once and reuse it:
+
+```javascript
+import NeuraiKey from "@neuraiproject/neurai-key";
+
+// Once per wallet, not once per address
+const hdKey = NeuraiKey.getHDKey("xna-legacy", mnemonic, passphrase);
+
+const addresses = [];
+for (let i = 0; i < 100; i++) {
+  addresses.push(NeuraiKey.getAddressByPath("xna-legacy", hdKey, `m/44'/1900'/0'/0/${i}`));
+}
+```
+
+The same applies to PQ (`getPQHDKey` + `getPQAddressByPath`) and to generic AuthScript (`getPQHDKey` + `getPQAuthScriptAddressByPath`).
+
+Run the reproducible benchmark from a checkout:
+
+```sh
+npm ci
+npm run bench
+```
+
+[`bench.mjs`](bench.mjs) compares identical outputs: 100 Legacy pairs (200 addresses, external and internal) in each approach, and 20 PQ addresses in each approach. The reused-key timings include creating the master key once per batch. Both approaches derive full paths from the master, with no account or branch caching. The benchmark warms up each approach, alternates their order over three rounds, checks that their addresses agree, and reports median batch times and time per address alongside the runtime and CPU.
+
+Results are indicative and depend on the runtime, hardware and batch size; there is no fixed speedup. Reusing the HD key avoids repeated seed generation during a wallet's [gap-limit scan](#address-gap-limit).
 
 ## Convert a public key into a Neurai address
 
@@ -536,12 +566,25 @@ If you have a private key in Wallet Import Format (WIF) and want the correspondi
 ```javascript
 import NeuraiKey from "@neuraiproject/neurai-key";
 
-const network = "xna-legacy"; // any secp256k1 network: the public key does not depend on it
+const network = "xna-legacy"; // must be the network the WIF belongs to
 const wif = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
 
 const pubkeyHex = NeuraiKey.getPubkeyByWIF(network, wif);
 console.log(pubkeyHex);
 ```
+
+### WIF network validation
+
+Every function that takes a WIF (`getAddressByWIF`, `getPubkeyByWIF`, `getLegacyAuthScriptAddressByWIF`) checks the WIF version byte against the network you pass — `0x80` on mainnet, `0xef` on testnet/regtest — and throws if they disagree:
+
+```javascript
+const mainnetWIF = "KwWavecys1Qskgzwsyv6CNeTospWkvMeLzx3dLqeV4xAJEMXF8Qq";
+
+NeuraiKey.getAddressByWIF("xna-legacy-test", mainnetWIF);
+// Error: WIF is for a different network (version byte 0x80, expected 0xef)
+```
+
+The node's `CNeuraiSecret::IsValid()` also checks the prefix against the active chain, so `importprivkey` rejects the original foreign-network WIF with *"Invalid private key encoding"*. The underlying secp256k1 private key is not tied to a network: explicitly re-encoding the same key with the target network's prefix and a recomputed Base58Check checksum produces a WIF that can be imported there. These APIs require a matching prefix to prevent that conversion from happening accidentally; transferring funds between networks is a separate matter.
 
 ## How to import into your project
 

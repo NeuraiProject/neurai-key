@@ -23,7 +23,12 @@ export function encodeWIF(privateKey: Uint8Array, version: number, compressed = 
   return base58CheckEncode(payload);
 }
 
-export function decodeWIF(wif: string): { privateKey: Uint8Array; version: number; compressed: boolean } {
+// The node's CNeuraiSecret::IsValid() requires a WIF prefix matching the active
+// chain, so importing a foreign WIF fails there with "Invalid private key
+// encoding". expectedVersion is required rather than optional so every caller
+// has to name the chain it means: a WIF from another network is rejected here
+// too instead of being silently re-encoded for the target network.
+export function decodeWIF(wif: string, expectedVersion: number): { privateKey: Uint8Array; version: number; compressed: boolean } {
   const payload = base58CheckDecode(wif);
   if (payload.length !== 33 && payload.length !== 34) {
     throw new Error("Invalid WIF length");
@@ -31,6 +36,13 @@ export function decodeWIF(wif: string): { privateKey: Uint8Array; version: numbe
 
   const version = payload[0];
   const compressed = payload.length === 34;
+
+  if (version !== expectedVersion) {
+    throw new Error(
+      `WIF is for a different network (version byte 0x${version.toString(16).padStart(2, "0")}, ` +
+        `expected 0x${expectedVersion.toString(16).padStart(2, "0")})`,
+    );
+  }
 
   if (compressed && payload[payload.length - 1] !== 0x01) {
     throw new Error("Invalid compressed WIF payload");
@@ -63,7 +75,7 @@ export function privateKeyToAddressObject(privateKey: Uint8Array, versions: Addr
 }
 
 export function addressObjectFromWIF(wif: string, versions: AddressVersions) {
-  const decoded = decodeWIF(wif);
+  const decoded = decodeWIF(wif, versions.private);
   const publicKey = decoded.compressed
     ? secp256k1.getPublicKey(decoded.privateKey, true)
     : secp256k1.getPublicKey(decoded.privateKey, false);
@@ -75,8 +87,8 @@ export function addressObjectFromWIF(wif: string, versions: AddressVersions) {
   };
 }
 
-export function publicKeyHexFromWIF(wif: string, compressed = true): string {
-  const decoded = decodeWIF(wif);
+export function publicKeyHexFromWIF(wif: string, expectedVersion: number, compressed = true): string {
+  const decoded = decodeWIF(wif, expectedVersion);
   return bytesToHex(secp256k1.getPublicKey(decoded.privateKey, compressed && decoded.compressed));
 }
 
@@ -145,6 +157,13 @@ export function authScriptCommitmentParts(
     commitment,
     witnessScript,
   };
+}
+
+// Encode a commitment authScriptCommitmentParts() already produced. Callers
+// that need the other parts too use this instead of the *ToAddressBytes
+// helpers, which would hash the public key a second time.
+export function commitmentToAddressBytes(commitment: Uint8Array, network: Bech32Params): string {
+  return bech32mEncode(network.hrp, network.witnessVersion, commitment);
 }
 
 // Generic AuthScript (witness v1): any authType, any witnessScript.

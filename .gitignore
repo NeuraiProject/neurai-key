@@ -12,7 +12,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
-package-lock.json
+
+# package-lock.json is tracked on purpose: it pins the dependency tree this
+# key library is built and published from. npm ignores it in consumers.
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json

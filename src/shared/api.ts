@@ -332,7 +332,7 @@ export function generatePQAddressObject(
 }
 
 // ---------------------------------------------------------------------------
-// Generic AuthScript: witness v1 (nq1p... / tnq1p...). Any authType and any
+// Generic AuthScript: witness v1 (nc1p... / tnc1p...). Any authType and any
 // witnessScript; used for contracts.
 // ---------------------------------------------------------------------------
 

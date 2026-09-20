@@ -188,7 +188,7 @@ describe("Generic AuthScript witness v1 with PQ key (authType=0x01)", () => {
     const reconstructed = NeuraiKey.pqPublicKeyToAuthScriptAddress("xna-authscript", addr.publicKey);
 
     expect(addr.address).toBe(
-      "nq1p5e3g0zyumlt8utualrdsfhnxad9ea9vc3ful3cndx5neh45cj0cqyt49ek"
+      "nc1p5e3g0zyumlt8utualrdsfhnxad9ea9vc3ful3cndx5neh45cj0cqklves5"
     );
     expect(addr.commitment).toBe(
       "a66287889cdfd67e2f9df8db04de66eb4b9e95988a79f8e26d35279bd69893f0"
@@ -196,7 +196,7 @@ describe("Generic AuthScript witness v1 with PQ key (authType=0x01)", () => {
     expect(addr.authDescriptor).toBe("01f969f2877426e5cccf2412fa11a49404b16b40f1");
     expect(addr.witnessScript).toBe("51");
     expect(addr.address).toBe(reconstructed);
-    expect(addr.address.startsWith("nq1")).toBe(true);
+    expect(addr.address.startsWith("nc1")).toBe(true);
     expect(addr.seedKey.length).toBe(64);
   });
 
@@ -209,19 +209,19 @@ describe("Generic AuthScript witness v1 with PQ key (authType=0x01)", () => {
     expect(addr1.publicKey).toBe(addr2.publicKey);
   });
 
-  test("Mainnet PQ addresses start with nq1", () => {
+  test("Mainnet PQ AuthScript addresses start with nc1", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAuthScriptAddress("xna-authscript", mnemonic, 0, 0);
-    expect(addr.address.startsWith("nq1")).toBe(true);
+    expect(addr.address.startsWith("nc1")).toBe(true);
   });
 
-  test("Testnet PQ addresses start with tnq1", () => {
+  test("Testnet PQ AuthScript addresses start with tnc1", () => {
     const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
     const addr = NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", mnemonic, 0, 0);
     expect(addr.address).toBe(
-      "tnq1pdsj0aztvgwv3rwgml360stpyp228zrggyga6n4sdenmetm6wv3tqzddk95"
+      "tnc1pdsj0aztvgwv3rwgml360stpyp228zrggyga6n4sdenmetm6wv3tqse52vk"
     );
-    expect(addr.address.startsWith("tnq1")).toBe(true);
+    expect(addr.address.startsWith("tnc1")).toBe(true);
   });
 
   test("Mainnet path follows NIP-022 (m_pq, all hardened)", () => {
@@ -266,7 +266,7 @@ describe("Generic AuthScript witness v1 with PQ key (authType=0x01)", () => {
     expect(addr1.commitment).toBe(addr2.commitment);
     expect(addr1.witnessScript).toBe("5151");
     expect(addr1.address).not.toBe(
-      "nq1pe2gr8awq39r3hhcwtw2p368sq8gz3qq2mwch8jy8r8uxcqwhw28qff08qd"
+      "nc1pe2gr8awq39r3hhcwtw2p368sq8gz3qq2mwch8jy8r8uxcqwhw28qmakmf0"
     );
   });
 
@@ -396,7 +396,7 @@ describe("NoAuth (authType=0x00) addresses", () => {
 
     expect(result.authType).toBe(0);
     expect(result.witnessScript).toBe("51");
-    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.address.startsWith("tnc1")).toBe(true);
     expect(result.commitment.length).toBe(64);
   });
 
@@ -425,9 +425,9 @@ describe("NoAuth (authType=0x00) addresses", () => {
     expect(fromBytes.address).toBe(fromHex.address);
   });
 
-  test("NoAuth mainnet address starts with nq1", () => {
+  test("NoAuth mainnet address starts with nc1", () => {
     const result = NeuraiKey.getNoAuthAddress("xna-authscript", OP_TRUE);
-    expect(result.address.startsWith("nq1")).toBe(true);
+    expect(result.address.startsWith("nc1")).toBe(true);
   });
 
   test("NoAuth commitment matches neurai-sign-transaction test vector", () => {
@@ -487,7 +487,7 @@ describe("Legacy AuthScript (authType=0x02) addresses", () => {
 
     expect(result.authType).toBe(2);
     expect(result.witnessScript).toBe("51");
-    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.address.startsWith("tnc1")).toBe(true);
     expect(result.WIF).toBeDefined();
     expect(result.publicKey.length).toBe(66);
   });
@@ -506,7 +506,7 @@ describe("Legacy AuthScript (authType=0x02) addresses", () => {
     const result = NeuraiKey.getLegacyAuthScriptAddressByWIF("xna-authscript-test", wif);
 
     expect(result.authType).toBe(2);
-    expect(result.address.startsWith("tnq1")).toBe(true);
+    expect(result.address.startsWith("tnc1")).toBe(true);
     expect(result.publicKey).toBe(
       "02666e9b6aacfa34715c1050e890fa8f07a5e73c70f23abdca585f1506514d81a0"
     );
@@ -571,13 +571,13 @@ describe("Node fixed vectors (scripts/data/authscript-vectors.json)", () => {
 
   test("Generic AuthScript (witness v1) addresses", () => {
     expect(NeuraiKey.pqPublicKeyToAuthScriptAddress("xna-authscript", FIXTURE_PQ_PUBKEY)).toBe(
-      "nq1p3y7kpr5qvg8czeqgw2kzg4w9msc7yw39h4z0qdvp3etwf7qzreksq9aae0"
+      "nc1p3y7kpr5qvg8czeqgw2kzg4w9msc7yw39h4z0qdvp3etwf7qzreksj3ypsd"
     );
     expect(NeuraiKey.pqPublicKeyToAuthScriptCommitmentHex(FIXTURE_PQ_PUBKEY)).toBe(
       "893d608e80620f81640872ac2455c5dc31e23a25bd44f035818e56e4f8021e6d"
     );
     expect(NeuraiKey.getNoAuthAddress("xna-authscript-test", { witnessScript: "51" }).address).toBe(
-      "tnq1p5mqcrlxczdlx2552xrjw94zhk5thsguygxu0thvfz8pqsjshaeasklteyq"
+      "tnc1p5mqcrlxczdlx2552xrjw94zhk5thsguygxu0thvfz8pqsjshaeasytj9dz"
     );
   });
 });
@@ -605,7 +605,7 @@ describe("PQ addresses (strict AuthScript witness v2)", () => {
   test("Same key as the generic AuthScript PQ address, different commitment and address", () => {
     const v1 = NeuraiKey.getPQAuthScriptAddress("xna-authscript-test", ABANDON, 0, 0);
     const v2 = NeuraiKey.getPQAddress("xna-pq-test", ABANDON, 0, 0);
-    expect(v1.address).toBe("tnq1pavsksr40nq495pmyt8unn73828a6ek8h9xf9f6ys0qa3fystrzxqc4883n");
+    expect(v1.address).toBe("tnc1pavsksr40nq495pmyt8unn73828a6ek8h9xf9f6ys0qa3fystrzxq2p7mc3");
     expect(v2.publicKey).toBe(v1.publicKey);
     expect(v2.authDescriptor).toBe(v1.authDescriptor);
     expect(v2.commitment).not.toBe(v1.commitment);

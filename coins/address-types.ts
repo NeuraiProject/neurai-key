@@ -71,7 +71,7 @@ const ecdsa = {
 } as const;
 
 /**
- * Generic AuthScript: Bech32m witness v1 (nq1p... / tnq1p...), used for contracts.
+ * Generic AuthScript: Bech32m witness v1 (nc1p... / tnc1p...), used for contracts.
  * Any authType and any witnessScript:
  *   0x00 NoAuth: no key
  *   0x01 PQ:     ML-DSA-44 key from the pq tree
@@ -80,7 +80,7 @@ const ecdsa = {
  */
 const authscript = {
   encoding: "bech32m",
-  hrp: { mainnet: "nq", testnet: "tnq" } as PerNetwork<string>,
+  hrp: { mainnet: "nc", testnet: "tnc" } as PerNetwork<string>,
   witnessVersion: 1,
   authTypes: [0x00, 0x01, 0x02],
   defaultWitnessScript: "51",

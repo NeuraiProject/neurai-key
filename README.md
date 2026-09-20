@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.0/dist/NeuraiKey.global.js   
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.0/dist/NeuraiKey.global.js
 
 ## Features
 
@@ -18,14 +18,20 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 - ✅ Convert raw public keys into Neurai mainnet or testnet addresses
 - ✅ PQ addresses (ML-DSA-44), Bech32m witness v2 (`pq1z…` / `tpq1z…`)
 - ✅ ECDSA addresses (secp256k1), Bech32m witness v3 (`nq1r…` / `tnq1r…`), network `xna`
-- ✅ Generic AuthScript witness v1 addresses for contracts (`nq1p…` / `tnq1p…`):
+- ✅ Generic AuthScript witness v1 addresses for contracts (`nc1p…` / `tnc1p…`):
   - `authType = 0x00` NoAuth addresses from `witnessScript` only
   - `authType = 0x01` ML-DSA-44 key with a custom `witnessScript`
   - `authType = 0x02` Legacy secp256k1 key with a custom `witnessScript`
 
 ## Compatibility Note
 
-### 5.0.0: address types follow the node
+### 5.0.0
+
+The node encodes generic AuthScript witness v1 addresses with `nc` on mainnet and `tnc` on testnet/regtest. Consequently, `xna-authscript` and `xna-authscript-test` now return `nc1p…` / `tnc1p…` instead of `nq1p…` / `tnq1p…`.
+
+The derivation, public key and commitment do not change; only the Bech32m HRP and checksum do. Existing `nq1p…` / `tnq1p…` strings are not accepted by current nodes, so regenerate the address from the same key or mnemonic rather than replacing its textual prefix.
+
+#### Address types follow the node
 
 The Neurai node now has one address type per family (`getnewaddress "" legacy|pq|ecdsa`), plus the generic AuthScript witness v1 for contracts. The library networks follow the same split, and **`xna` is now the ECDSA address**:
 
@@ -35,9 +41,9 @@ The Neurai node now has one address type per family (`getnewaddress "" legacy|pq
 | `xna-legacy` / `xna-legacy-test` | Legacy Base58, coin type 0 `m/44'/0'` (testnet `m/44'/1'`) | **Legacy Base58, `m/44'/1900'`** (testnet `m/44'/1'`, unchanged) |
 | `xna-old-legacy` | — | **new name** for Legacy Base58 with coin type 0 `m/44'/0'` (the 4.x `xna-legacy`) |
 | `xna-pq` / `xna-pq-test` | generic witness v1 `nq1p…` / `tnq1p…` | **PQ witness v2 `pq1z…` / `tpq1z…`** |
-| `xna-authscript` / `xna-authscript-test` | — (was `xna-pq`) | **new name** for generic witness v1 `nq1p…` / `tnq1p…` |
+| `xna-authscript` / `xna-authscript-test` | — (was `xna-pq`) | **new name** for generic witness v1 `nc1p…` / `tnc1p…` |
 
-⚠️ `xna`, `xna-legacy` and `xna-pq` keep their names but **return different addresses than 4.x for the same mnemonic, without any error**. When upgrading, rename `xna` → `xna-legacy`, `xna-legacy` → `xna-old-legacy` and `xna-pq` → `xna-authscript` (with the `*AuthScript*` PQ functions) to keep the 4.x addresses.
+⚠️ `xna`, `xna-legacy` and `xna-pq` keep their names but **return different addresses than 4.x for the same mnemonic, without any error**. When upgrading, rename `xna` → `xna-legacy`, `xna-legacy` → `xna-old-legacy` and `xna-pq` → `xna-authscript` (with the `*AuthScript*` PQ functions) to keep the 4.x derivation and commitment. The generic AuthScript address is re-encoded as `nc1p…` / `tnc1p…` in 5.0.0.
 
 Breaking changes versus `4.x`:
 - `getAddressPair`, `getAddressByPath`, `getAddressByWIF`, `publicKeyToAddress`, `getHDKey`, `getCoinType`, `generateAddress` and `generateAddressObject` select the address type from the network: `xna` / `xna-test` give ECDSA witness v3 addresses (with `witnessVersion`, `authType`, `authDescriptor`, `commitment` and `witnessScript`), the `*-legacy` networks give Base58. ECDSA rejects uncompressed keys and WIF.
@@ -45,7 +51,7 @@ Breaking changes versus `4.x`:
 - `xna-old-legacy` has no testnet id: on testnet the coin type is 1 in both Legacy types, so `xna-legacy-test` gives the same path.
 - `getLegacyAuthScriptAddress(network, keyNetwork, …)` derives the secp256k1 key with the derivation of `keyNetwork`: use `xna-legacy` / `xna-legacy-test` for the 4.x `m/44'` key.
 - `getPQAddress`, `getPQAddressByPath`, `pqPublicKeyToAddress`, `pqPublicKeyToCommitmentHex` and `generatePQAddressObject` return the witness v2 PQ address. They no longer take AuthScript options (the template is fixed to `OP_TRUE`): passing the old `options` argument throws an error that points to the `*AuthScript*` function, so a contract `witnessScript` is never dropped silently.
-- The witness v1 PQ address moved to `getPQAuthScriptAddress`, `getPQAuthScriptAddressByPath`, `pqPublicKeyToAuthScriptAddress` and `pqPublicKeyToAuthScriptCommitmentHex`, with the `xna-authscript` networks. The same mnemonic and index give **the same `nq1p…` / `tnq1p…` address as 4.x**.
+- The witness v1 PQ address moved to `getPQAuthScriptAddress`, `getPQAuthScriptAddressByPath`, `pqPublicKeyToAuthScriptAddress` and `pqPublicKeyToAuthScriptCommitmentHex`, with the `xna-authscript` networks. The same mnemonic and index give the same PQ key and commitment as 4.x, encoded as **`nc1p…` / `tnc1p…`**.
 - `getNoAuthAddress`, `getLegacyAuthScriptAddress` and `getLegacyAuthScriptAddressByWIF` take `xna-authscript` / `xna-authscript-test` instead of `xna-pq` / `xna-pq-test`.
 - `getNoAuthAddress(network, { witnessScript })` requires the `witnessScript`. In 4.x it defaulted to `OP_TRUE`, which with NoAuth is an output anyone can spend. Pass `{ witnessScript: "51" }` explicitly to get the 4.x address.
 - An empty `witnessScript` (`""` or an empty byte array) now throws in every AuthScript function. In 4.x `""` was silently replaced by `OP_TRUE`.
@@ -88,11 +94,11 @@ Each network selects one address type. The configuration lives in [`coins/`](coi
 | `xna-legacy` / `xna-legacy-test` | `legacy` | secp256k1, `m/44'/1900'/…` / `m/44'/1'/…` | Base58Check | `N…` / `t…` |
 | `xna-old-legacy` (mainnet only) | `oldLegacy`: coin type 0, used by the node wallet, exchanges and early wallets; not recommended for new wallets | secp256k1, `m/44'/0'/…` | Base58Check | `N…` |
 | `xna-pq` / `xna-pq-test` | `pq` | ML-DSA-44, `m_pq/100'/1900'/…` / `m_pq/100'/1'/…` (all hardened) | Bech32m witness v2 | `pq1z…` / `tpq1z…` |
-| `xna-authscript` / `xna-authscript-test` | `authscript` (contracts) | PQ tree for `0x01`, BIP44 for `0x02`, none for `0x00` | Bech32m witness v1 | `nq1p…` / `tnq1p…` |
+| `xna-authscript` / `xna-authscript-test` | `authscript` (contracts) | PQ tree for `0x01`, BIP44 for `0x02`, none for `0x00` | Bech32m witness v1 | `nc1p…` / `tnc1p…` |
 
 **Note**: Using different network types will generate completely different addresses from the same mnemonic.
 
-**Regtest**: there is no dedicated `regtest` network — use the `*-test` networks. The Neurai node shares all address encoding between testnet and regtest: same network magic, same Base58 prefixes, same coin type (1), same Bech32m HRPs (`tnq`, `tpq`) and same extended key versions (`tprv`/`tpub`/`tpqp`). Only the ports differ (regtest `19200` / RPC `19201`).
+**Regtest**: there is no dedicated `regtest` network — use the `*-test` networks. The Neurai node shares all address encoding between testnet and regtest: same network magic, same Base58 prefixes, same coin type (1), same Bech32m HRPs (`tnc`, `tnq`, `tpq`) and same extended key versions (`tprv`/`tpub`/`tpqp`). Only the ports differ (regtest `19200` / RPC `19201`).
 
 
 ## Example get external and internal (change) addresses by path
@@ -256,7 +262,7 @@ commitment = tagged_hash("NeuraiAuthScript", version || auth_descriptor || SHA25
 | | PQ | ECDSA | Generic AuthScript |
 |---|---|---|---|
 | Network | `xna-pq` / `xna-pq-test` | `xna` / `xna-test` | `xna-authscript` / `xna-authscript-test` |
-| Witness version / prefix | 2, `pq1z…` / `tpq1z…` | 3, `nq1r…` / `tnq1r…` | 1, `nq1p…` / `tnq1p…` |
+| Witness version / prefix | 2, `pq1z…` / `tpq1z…` | 3, `nq1r…` / `tnq1r…` | 1, `nc1p…` / `tnc1p…` |
 | `authType` | `0x01` (fixed) | `0x02` (fixed) | `0x00`, `0x01` or `0x02` |
 | Auth descriptor | `0x01 \|\| HASH160(0x05 \|\| pq_pubkey)` | `0x02 \|\| HASH160(compressed_pubkey)` | per `authType` |
 | `witnessScript` | `OP_TRUE` (`51`), fixed | `OP_TRUE` (`51`), fixed | any; default `OP_TRUE` with a key (`0x01` / `0x02`), required for NoAuth (`0x00`) |
@@ -413,7 +419,7 @@ Uncompressed keys (65-byte public keys or uncompressed WIF) are rejected, becaus
 
 ## Generic AuthScript addresses (witness v1)
 
-Witness v1 accepts any `authType` and any `witnessScript`, so it is the family used for contracts. It uses the `xna-authscript` / `xna-authscript-test` networks (`nq1p…` / `tnq1p…`).
+Witness v1 accepts any `authType` and any `witnessScript`, so it is the family used for contracts. It uses the `xna-authscript` / `xna-authscript-test` networks (`nc1p…` / `tnc1p…`).
 
 | `authType` | Name | Key |
 |------------|------|-----|
@@ -435,12 +441,12 @@ const pqAuthScript = NeuraiKey.getPQAuthScriptAddress("xna-authscript", mnemonic
   witnessScript: "5151"
 });
 
-console.log(pqAuthScript.address);       // nq1p...
+console.log(pqAuthScript.address);       // nc1p...
 console.log(pqAuthScript.witnessScript); // 5151
 console.log(pqAuthScript.commitment);    // 32-byte commitment
 ```
 
-Without options it returns the same `nq1p…` / `tnq1p…` address that `getPQAddress()` returned in `4.x`. Also available: `getPQAuthScriptAddressByPath(network, pqHdKey, path, options)`, `pqPublicKeyToAuthScriptAddress(network, publicKey, options)` and `pqPublicKeyToAuthScriptCommitmentHex(publicKey, options)`.
+Without options it uses the same PQ key and commitment that `getPQAddress()` returned in `4.x`, encoded as `nc1p…` / `tnc1p…`. Also available: `getPQAuthScriptAddressByPath(network, pqHdKey, path, options)`, `pqPublicKeyToAuthScriptAddress(network, publicKey, options)` and `pqPublicKeyToAuthScriptCommitmentHex(publicKey, options)`.
 
 ### Generate a NoAuth address
 
@@ -460,7 +466,7 @@ Outputs
 
 ```javascript
 {
-  address: "tnq1...",
+  address: "tnc1...",
   witnessVersion: 1,
   authType: 0,
   commitment: "...",
@@ -496,7 +502,7 @@ Outputs
 
 ```javascript
 {
-  address: "tnq1...",
+  address: "tnc1...",
   path: "m/44'/1'/0'/0/0",
   publicKey: "...",                    // compressed secp256k1 pubkey
   privateKey: "...",

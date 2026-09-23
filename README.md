@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.1/dist/NeuraiKey.global.js
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.2/dist/NeuraiKey.global.js
 
 ## Features
 
@@ -24,6 +24,10 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
   - `authType = 0x02` Legacy secp256k1 key with a custom `witnessScript`
 
 ## Compatibility Note
+
+### 5.0.2
+
+TypeScript declarations for CommonJS. `require("@neuraiproject/neurai-key")` loads `dist/index.cjs`, but the package only published ESM declarations, so a CommonJS file compiled with `moduleResolution: "node16"` got `TS1471` and no types. Each condition of `exports` now has its own declarations (`import` → `dist/index.d.ts`, `require` → `dist/index.d.cts`). No runtime or API change. `npm run test:types` compiles ESM, CommonJS and browser consumers against the built declarations (NodeNext, Node16, Bundler; `skipLibCheck: false`), and `npm run test:package` checks the packed tarball in a clean project, with TypeScript 4.7 too.
 
 ### 5.0.1
 

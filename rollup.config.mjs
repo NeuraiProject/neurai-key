@@ -124,9 +124,12 @@ export default [
   {
     input: "./src/index.ts",
     plugins: [dts()],
-    output: {
-      file: "./dist/index.d.ts",
-      format: "esm",
-    },
+    // The same self-contained declarations serve both entry points: ESM
+    // (index.d.ts, for index.js) and CommonJS (index.d.cts, for index.cjs,
+    // which exports the same values plus `exports.default`).
+    output: [
+      { file: "./dist/index.d.ts", format: "esm" },
+      { file: "./dist/index.d.cts", format: "esm" },
+    ],
   },
 ];

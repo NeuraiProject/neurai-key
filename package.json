@@ -1,6 +1,6 @@
 {
   "name": "@neuraiproject/neurai-key",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Generate Neurai addresses from mnemonic code. BIP32, BIP39, BIP44",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -26,7 +26,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && rollup -c",
-    "test": "npm run build && vitest run ./test.test.mjs ./hdkey.test.mjs",
+    "test": "npm run build && vitest run ./test.test.mjs ./hdkey.test.mjs ./dist-imports.test.mjs",
     "bench": "npm run build && node ./bench.mjs"
   },
   "repository": {

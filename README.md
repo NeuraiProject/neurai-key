@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.0/dist/NeuraiKey.global.js
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.1/dist/NeuraiKey.global.js
 
 ## Features
 
@@ -24,6 +24,10 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
   - `authType = 0x02` Legacy secp256k1 key with a custom `witnessScript`
 
 ## Compatibility Note
+
+### 5.0.1
+
+Rebuild of 5.0.0 with no API or address change. The 5.0.0 package was published from a stale build left by an experiment with `tiny-secp256k1` that was later removed from the code: both `dist/index.js` (ESM) and `dist/index.cjs` (CommonJS) still loaded `tiny-secp256k1`, which is not a dependency, so a clean install failed on `import` (*Cannot find package 'tiny-secp256k1'*) and on `require` (*Cannot find module 'tiny-secp256k1'*). The browser bundles were not affected. 5.0.1 is built from the current source (addresses identical to 5.0.0), drops the leftover `dist/browser-wasm.js`, and a test checks that the published files only load declared dependencies.
 
 ### 5.0.0
 

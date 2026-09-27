@@ -2,7 +2,7 @@ const NeuraiKey = require("./dist/index.cjs");
 
 console.log("=== Neurai Key - PostQuantum (ML-DSA-44) Example ===\n");
 // PQ addresses are strict AuthScript witness v2 (pq1z... / tpq1z...).
-// Currently only active on regtest (regtest shares the testnet encoding).
+// Active on the reset testnet from block 10 and on regtest from block 1.
 
 const mnemonic = "result pact model attract result puzzle final boss private educate luggage era";
 const network = "xna-pq-test"; // use "xna-pq" for mainnet

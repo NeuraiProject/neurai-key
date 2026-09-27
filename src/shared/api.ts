@@ -197,7 +197,7 @@ export function entropyToMnemonic(entropy: Uint8Array | string): string {
   return bip39EntropyToMnemonic(normalized, englishWordlist);
 }
 
-// Default stays Legacy: ECDSA witness v3 is not active on mainnet/testnet yet.
+// Keep the Legacy default for compatibility; ECDSA witness v3 starts at testnet height 10.
 export function generateAddressObject(network: Network = "xna-legacy", passphrase = ""): IAddressObject {
   const mnemonic = generateMnemonic();
   const addressObject = getAddressPair(network, mnemonic, 0, 0, passphrase).external;

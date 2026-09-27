@@ -5,7 +5,7 @@ Generate Neurai addresses from a mnemonic phrase following the standards BIP32, 
 That is, use your 12 words to get addresses for Neurai mainnet and testnet.
 
 **NPM**: https://www.npmjs.com/package/@neuraiproject/neurai-key   
-**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.2/dist/NeuraiKey.global.js
+**CDN**: https://cdn.jsdelivr.net/npm/@neuraiproject/neurai-key@5.0.3/dist/NeuraiKey.global.js
 
 ## Features
 
@@ -24,6 +24,14 @@ That is, use your 12 words to get addresses for Neurai mainnet and testnet.
   - `authType = 0x02` Legacy secp256k1 key with a custom `witnessScript`
 
 ## Compatibility Note
+
+### 5.0.3
+
+The reset testnet genesis and DNS seeds match Neurai-DePIN at commit
+`0fe5a74943210508ec3be34c78e0f9192b7fefec`. Testnet AuthScript v1/v2/v3
+activates at block 10. Address prefixes and mnemonic derivation are unchanged;
+addresses from the same seed remain the same, but funds and history on the old
+testnet do not carry over.
 
 ### 5.0.2
 
@@ -73,10 +81,10 @@ The library already generates every format, but the node only protects an addres
 | Address type | Mainnet | Testnet | Regtest |
 |---|---|---|---|
 | Legacy (`xna-legacy`, `xna-old-legacy`) | ✅ | ✅ | ✅ |
-| Generic AuthScript witness v1 (`xna-authscript`) | ❌ not active: outputs are not protected | ✅ | ✅ |
-| PQ witness v2 (`xna-pq`), ECDSA witness v3 (`xna`) | ❌ the node rejects the address | ❌ the node rejects the address | ✅ |
+| Generic AuthScript witness v1 (`xna-authscript`) | ❌ not active: outputs are not protected | From block 10 | From block 1 |
+| PQ witness v2 (`xna-pq`), ECDSA witness v3 (`xna`) | ❌ the node rejects the address | From block 10 | From block 1 |
 
-Until activation is announced: use **Legacy** (`xna-legacy`) on mainnet, Legacy or `xna-authscript-test` on testnet, and any type on regtest.
+Before testnet block 10, use Legacy addresses. AuthScript outputs included in blocks 1-9 have no AuthScript spend protection even though mempool policy rejects creating them.
 
 ### 4.0.0: native PQ HD tree
 
@@ -306,7 +314,7 @@ commitment = tagged_hash("NeuraiAuthScript", version || auth_descriptor || SHA25
 | `witnessScript` | `OP_TRUE` (`51`), fixed | `OP_TRUE` (`51`), fixed | any; default `OP_TRUE` with a key (`0x01` / `0x02`), required for NoAuth (`0x00`) |
 | Use | receive PQ | receive ECDSA | contracts |
 
-PQ and ECDSA are only active on regtest, and generic AuthScript is not active on mainnet (see [activation per network](#activation-per-network)).
+All three AuthScript families activate on the reset testnet at block 10 and on regtest at block 1; none is active on mainnet (see [activation per network](#activation-per-network)).
 
 `commitment` is returned as the raw SHA-256 digest. The node's `validateaddress` shows it as a byte-reversed `uint256`.
 

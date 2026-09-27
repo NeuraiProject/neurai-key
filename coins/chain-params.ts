@@ -76,9 +76,8 @@ const testnet: ChainParams = {
   ...neurai,
   network: "testnet",
   id: "1EB2ACBA-E8E0-4970-BB20-37DA4B70F6A6",
-  // Not asserted in chainparams.cpp: the node mines it deterministically at startup
-  // (time 1774828800, nonce 1045805). Value taken from a Neurai 2.0.0 node.
-  hashGenesisBlock: "0000009697907b2aa409d4b1f10da0fa14f5a52a2e31faf3886c0444b3c85e84",
+  // Reset testnet genesis: fixed SHA256d hash, time 1790380800 and nonce 3409810.
+  hashGenesisBlock: "0000008b384aeffecdab182575dc4e86c9f07f90318c65088532660ed9a8a021",
   port: 19100,
   portRpc: 19101,
   magic: 1313166674, // "RUEN"
